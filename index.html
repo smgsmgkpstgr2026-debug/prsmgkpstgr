@@ -32,6 +32,8 @@
     #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
     #hiddenFileInput { display: none; }
     .scan-link { word-break: break-all; }
+    .scan-result-card { cursor: pointer; transition: all 0.2s; }
+    .scan-result-card:hover { background-color: #f0f0f0; }
   </style>
 </head>
 <body>
@@ -77,7 +79,7 @@
     </div>
   </div>
 
-  <!-- Modal hasil scan (link) -->
+  <!-- Modal hasil scan (tampilan lebih sederhana) -->
   <div class="modal fade" id="scanResultModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -86,10 +88,14 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="text-center mb-3">
+            <i class="fas fa-check-circle text-success" style="font-size: 48px;"></i>
+          </div>
+          <p><strong>Barcode:</strong> <span id="scanBarcodeValue"></span></p>
           <p><strong>Barang:</strong> <span id="scanItemName"></span></p>
           <p><strong>Link:</strong></p>
           <div class="alert alert-info scan-link" id="scanItemLink"></div>
-          <p class="text-muted">Salin link di atas atau klik tombol di bawah untuk melihat detail.</p>
+          <p class="text-muted">Klik link di atas untuk membuka detail, atau klik tombol Lihat Detail.</p>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
@@ -731,18 +737,17 @@
       
       scanner = new Instascan.Scanner({ video, scanPeriod: 5, refractoryPeriod: 100 });
       scanner.addListener('scan', function (content) {
-        // Bersihkan hasil scan dari karakter yang tidak diinginkan
+        // Bersihkan hasil scan
         const cleanContent = content.trim().replace(/\s+/g, '');
-        console.log('Barcode terdeteksi (asli):', content);
-        console.log('Barcode terdeteksi (bersih):', cleanContent);
+        console.log('Barcode terdeteksi:', cleanContent);
         
+        // Tampilkan di layar
         document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${cleanContent}</span>`;
+        
+        // Hentikan scanner
         scanner.stop();
         
-        // Debug: tampilkan semua barcode yang ada di database
-        console.log('Semua barcode di database:', items.map(i => i.barcode));
-        
-        // Cari item dengan pencarian fleksibel
+        // Cari item di database
         const item = items.find(i => {
           const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
           return itemBarcode.toLowerCase() === cleanContent.toLowerCase();
@@ -750,24 +755,13 @@
         
         if (item) {
           console.log('Item ditemukan:', item);
+          // Tutup modal scan
           bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
+          // Tampilkan hasil scan
           showScanResultModal(item);
         } else {
-          console.log('Item tidak ditemukan. Mencoba pencarian parsial...');
-          // Coba cari dengan awalan (jika barcode tidak lengkap)
-          const partialItem = items.find(i => 
-            i.barcode.toLowerCase().includes(cleanContent.toLowerCase()) ||
-            cleanContent.toLowerCase().includes(i.barcode.toLowerCase())
-          );
-          
-          if (partialItem) {
-            console.log('Item ditemukan (pencarian parsial):', partialItem);
-            bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
-            showScanResultModal(partialItem);
-          } else {
-            alert('Barang dengan barcode ' + cleanContent + ' tidak ditemukan.\n\nBarcode yang tersedia: ' + 
-                  items.map(i => i.barcode).join(', '));
-          }
+          alert('Barang dengan barcode ' + cleanContent + ' tidak ditemukan.');
+          // Biarkan modal scan tetap terbuka, user bisa scan ulang atau input manual
         }
       });
 
@@ -789,8 +783,7 @@
       if (!code) return alert('Masukkan kode');
       
       const cleanCode = code.replace(/\s+/g, '');
-      console.log('Manual scan (asli):', code);
-      console.log('Manual scan (bersih):', cleanCode);
+      console.log('Manual scan:', cleanCode);
       
       const item = items.find(i => {
         const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
@@ -798,7 +791,6 @@
       });
       
       if (item) {
-        console.log('Item ditemukan:', item);
         bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
         showScanResultModal(item);
       } else {
@@ -808,11 +800,19 @@
 
     // Fungsi untuk menampilkan modal hasil scan dengan link
     function showScanResultModal(item) {
-      console.log('Menampilkan modal hasil scan untuk item:', item);
+      console.log('Menampilkan modal hasil scan:', item);
+      
+      // Simpan item yang di-scan
       lastScannedItem = item;
+      
+      // Isi modal
+      document.getElementById('scanBarcodeValue').innerText = item.barcode;
       document.getElementById('scanItemName').innerText = item.name;
+      
       const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
       document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+      
+      // Tampilkan modal
       if (!scanResultModal) {
         scanResultModal = new bootstrap.Modal(document.getElementById('scanResultModal'));
       }
