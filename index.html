@@ -14,8 +14,8 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <!-- PapaParse (CSV) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <!-- instascan (kamera) -->
-  <script src="https://cdn.jsdelivr.net/npm/instascan@1.0.0-beta.4/instascan.min.js"></script>
+  <!-- instascan (kamera) - dengan fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/instascan@1.0.0-beta.4/instascan.min.js" onerror="handleInstascanError()"></script>
   <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Firebase SDK (compat) -->
@@ -34,6 +34,7 @@
     .scan-link { word-break: break-all; }
     .scan-result-card { cursor: pointer; transition: all 0.2s; }
     .barcode-wrapper { text-align: center; padding: 5px; background: #fff; border-radius: 4px; display: inline-block; max-width: 100%; overflow-x: auto; }
+    .camera-error { color: #dc3545; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -67,6 +68,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div id="cameraStatus" class="alert alert-info">Mengakses kamera...</div>
           <video id="preview" style="width:100%;" playsinline autoplay></video>
           <div class="mt-2 text-center" id="scanResult"></div>
           <div class="mt-3">
@@ -211,8 +213,16 @@
 
     // Fungsi untuk membuat URL pendek dari kode barcode
     function getBarcodeUrl(barcodeCode) {
-      // Gunakan parameter 'b' yang lebih pendek
       return window.location.origin + window.location.pathname + '?b=' + encodeURIComponent(barcodeCode);
+    }
+
+    function handleInstascanError() {
+      console.error('Gagal memuat instascan.min.js');
+      const statusDiv = document.getElementById('cameraStatus');
+      if (statusDiv) {
+        statusDiv.className = 'alert alert-warning';
+        statusDiv.innerHTML = 'Library scanner tidak tersedia. Gunakan input manual di bawah.';
+      }
     }
 
     function startItemsListener(callback) {
@@ -480,7 +490,6 @@
           const svg = document.getElementById(`barcode-${item.id}`);
           if (svg) {
             const url = getBarcodeUrl(item.barcode);
-            // Gunakan width=2 agar lebar total tidak terlalu besar
             JsBarcode(svg, url, {
               format: "CODE128",
               width: 2,
@@ -730,29 +739,45 @@
 
     function showScanModal() {
       const modalEl = document.getElementById('scanModal');
-      scanModalInstance = new bootstrap.Modal(modalEl);
       
+      // Reset status kamera
+      const statusDiv = document.getElementById('cameraStatus');
+      if (statusDiv) {
+        statusDiv.className = 'alert alert-info';
+        statusDiv.innerHTML = 'Mengakses kamera...';
+      }
+
+      // Cek apakah Instascan tersedia
+      if (typeof Instascan === 'undefined') {
+        if (statusDiv) {
+          statusDiv.className = 'alert alert-warning';
+          statusDiv.innerHTML = 'Library scanner tidak tersedia. Gunakan input manual di bawah.';
+        }
+        // Tetap tampilkan modal tanpa kamera
+        scanModalInstance = new bootstrap.Modal(modalEl);
+        scanModalInstance.show();
+        return;
+      }
+
       // Hentikan scanner jika sebelumnya aktif
       if (scanner) {
         scanner.stop();
         scanner = null;
       }
 
-      // Event ketika modal sudah tampil
+      scanModalInstance = new bootstrap.Modal(modalEl);
+      
       modalEl.addEventListener('shown.bs.modal', function onShown() {
         modalEl.removeEventListener('shown.bs.modal', onShown);
-        // Beri sedikit jeda agar DOM siap
-        setTimeout(initScanner, 300);
+        setTimeout(initScanner, 500);
       });
 
-      // Event ketika modal ditutup
       modalEl.addEventListener('hidden.bs.modal', function onHidden() {
         modalEl.removeEventListener('hidden.bs.modal', onHidden);
         if (scanner) {
           scanner.stop();
           scanner = null;
         }
-        // Hapus video stream
         const video = document.getElementById('preview');
         if (video && video.srcObject) {
           video.srcObject.getTracks().forEach(track => track.stop());
@@ -767,12 +792,18 @@
       const video = document.getElementById('preview');
       if (!video) return;
 
+      // Cek apakah instascan tersedia (sudah dicek di showScanModal, tapi amankan)
+      if (typeof Instascan === 'undefined') {
+        document.getElementById('cameraStatus').innerHTML = 'Library scanner tidak tersedia. Gunakan input manual.';
+        return;
+      }
+
       // Pastikan video visible
       video.style.display = 'block';
 
       // Cek dukungan kamera
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Browser Anda tidak mendukung akses kamera. Gunakan input manual.');
+        document.getElementById('cameraStatus').innerHTML = 'Browser Anda tidak mendukung akses kamera. Gunakan input manual.';
         return;
       }
 
@@ -817,26 +848,40 @@
         }
       });
 
-      Instascan.Camera.getCameras().then(cameras => {
-        if (cameras.length > 0) {
-          // Prioritaskan kamera belakang
-          const backCamera = cameras.find(c => 
-            c.name.toLowerCase().includes('back') || 
-            c.name.toLowerCase().includes('rear') ||
-            c.name.toLowerCase().includes('belakang')
-          ) || cameras[0];
+      // Minta izin kamera dan mulai scanner
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          // Hentikan stream sementara, nanti instascan yang akan mengelola
+          stream.getTracks().forEach(track => track.stop());
           
-          scanner.start(backCamera).catch(err => {
-            console.error('Gagal memulai kamera:', err);
-            alert('Tidak dapat mengakses kamera: ' + err.message);
+          // Lanjutkan dengan instascan
+          Instascan.Camera.getCameras().then(cameras => {
+            if (cameras.length > 0) {
+              // Prioritaskan kamera belakang
+              const backCamera = cameras.find(c => 
+                c.name.toLowerCase().includes('back') || 
+                c.name.toLowerCase().includes('rear') ||
+                c.name.toLowerCase().includes('belakang')
+              ) || cameras[0];
+              
+              scanner.start(backCamera).then(() => {
+                document.getElementById('cameraStatus').innerHTML = 'Kamera aktif. Arahkan ke barcode.';
+              }).catch(err => {
+                console.error('Gagal memulai kamera:', err);
+                document.getElementById('cameraStatus').innerHTML = 'Gagal memulai kamera: ' + err.message;
+              });
+            } else {
+              document.getElementById('cameraStatus').innerHTML = 'Tidak ada kamera yang ditemukan. Gunakan input manual.';
+            }
+          }).catch(err => {
+            console.error('Error accessing cameras:', err);
+            document.getElementById('cameraStatus').innerHTML = 'Gagal mengakses kamera: ' + err.message;
           });
-        } else {
-          alert('Tidak ada kamera yang ditemukan. Gunakan input manual.');
-        }
-      }).catch(err => {
-        console.error('Error accessing cameras:', err);
-        alert('Gagal mengakses kamera: ' + err.message);
-      });
+        })
+        .catch(err => {
+          console.error('Izin kamera ditolak:', err);
+          document.getElementById('cameraStatus').innerHTML = 'Izin kamera ditolak. Gunakan input manual.';
+        });
     }
 
     function manualScan() {
