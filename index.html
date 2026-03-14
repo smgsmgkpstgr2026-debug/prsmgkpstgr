@@ -31,6 +31,7 @@
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
     #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
     #hiddenFileInput { display: none; }
+    .scan-link { word-break: break-all; }
   </style>
 </head>
 <body>
@@ -71,6 +72,28 @@
             <input type="text" id="manualBarcode" class="form-control" placeholder="Ketik kode barcode">
             <button class="btn btn-secondary mt-2" onclick="manualScan()">Cari</button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal hasil scan (link) -->
+  <div class="modal fade" id="scanResultModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Hasil Scan</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Barang:</strong> <span id="scanItemName"></span></p>
+          <p><strong>Link:</strong></p>
+          <div class="alert alert-info scan-link" id="scanItemLink"></div>
+          <p class="text-muted">Salin link di atas atau klik tombol di bawah untuk melihat detail.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          <button type="button" class="btn btn-primary" onclick="goToDetailFromScan()">Lihat Detail</button>
         </div>
       </div>
     </div>
@@ -173,8 +196,12 @@
       item: null        // untuk edit: objek item
     };
 
-    // Modal imageOption
+    // Variabel untuk menyimpan hasil scan terakhir
+    let lastScannedItem = null;
+
+    // Modal
     let imageOptionModal = null;
+    let scanResultModal = null;
 
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
@@ -708,8 +735,10 @@
         scanner.stop();
         const item = items.find(i => i.barcode.trim().toLowerCase() === content.trim().toLowerCase());
         if (item) {
+          // Tutup modal scan
           bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
-          displayItemDetailModal(item);
+          // Tampilkan modal hasil scan dengan link
+          showScanResultModal(item);
         } else {
           alert('Barang tidak ditemukan');
         }
@@ -730,10 +759,30 @@
       if (!code) return alert('Masukkan kode');
       const item = items.find(i => i.barcode.trim().toLowerCase() === code.trim().toLowerCase());
       if (item) {
-        displayItemDetailModal(item);
         bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
+        showScanResultModal(item);
       } else {
         alert('Barang tidak ditemukan');
+      }
+    }
+
+    // Fungsi untuk menampilkan modal hasil scan dengan link
+    function showScanResultModal(item) {
+      lastScannedItem = item;
+      document.getElementById('scanItemName').innerText = item.name;
+      const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
+      document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+      if (!scanResultModal) {
+        scanResultModal = new bootstrap.Modal(document.getElementById('scanResultModal'));
+      }
+      scanResultModal.show();
+    }
+
+    // Fungsi untuk pergi ke detail dari modal hasil scan
+    function goToDetailFromScan() {
+      if (scanResultModal) scanResultModal.hide();
+      if (lastScannedItem) {
+        displayItemDetailModal(lastScannedItem);
       }
     }
 
