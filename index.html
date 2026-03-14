@@ -33,7 +33,7 @@
     #hiddenFileInput { display: none; }
     .scan-link { word-break: break-all; }
     .scan-result-card { cursor: pointer; transition: all 0.2s; }
-    .barcode-wrapper { text-align: center; padding: 5px; background: #fff; border-radius: 4px; display: inline-block; }
+    .barcode-wrapper { text-align: center; padding: 5px; background: #fff; border-radius: 4px; display: inline-block; max-width: 100%; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -209,9 +209,10 @@
     let imageOptionModal = null;
     let scanResultModal = null;
 
-    // Fungsi untuk membuat URL dari kode barcode
+    // Fungsi untuk membuat URL pendek dari kode barcode
     function getBarcodeUrl(barcodeCode) {
-      return window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(barcodeCode);
+      // Gunakan parameter 'b' yang lebih pendek
+      return window.location.origin + window.location.pathname + '?b=' + encodeURIComponent(barcodeCode);
     }
 
     function startItemsListener(callback) {
@@ -479,10 +480,11 @@
           const svg = document.getElementById(`barcode-${item.id}`);
           if (svg) {
             const url = getBarcodeUrl(item.barcode);
+            // Gunakan width=2 agar lebar total tidak terlalu besar
             JsBarcode(svg, url, {
               format: "CODE128",
-              width: 4,
-              height: 100,
+              width: 2,
+              height: 80,
               displayValue: false,
               margin: 10,
               background: "#ffffff",
@@ -736,16 +738,25 @@
         scanner = null;
       }
 
+      // Event ketika modal sudah tampil
       modalEl.addEventListener('shown.bs.modal', function onShown() {
         modalEl.removeEventListener('shown.bs.modal', onShown);
-        initScanner();
+        // Beri sedikit jeda agar DOM siap
+        setTimeout(initScanner, 300);
       });
 
+      // Event ketika modal ditutup
       modalEl.addEventListener('hidden.bs.modal', function onHidden() {
         modalEl.removeEventListener('hidden.bs.modal', onHidden);
         if (scanner) {
           scanner.stop();
           scanner = null;
+        }
+        // Hapus video stream
+        const video = document.getElementById('preview');
+        if (video && video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
         }
       });
 
@@ -758,6 +769,12 @@
 
       // Pastikan video visible
       video.style.display = 'block';
+
+      // Cek dukungan kamera
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Browser Anda tidak mendukung akses kamera. Gunakan input manual.');
+        return;
+      }
 
       scanner = new Instascan.Scanner({
         video: video,
@@ -776,10 +793,12 @@
         // Ekstrak kode barcode dari content (bisa URL atau teks biasa)
         let barcodeCode = content;
         try {
-          // Jika content adalah URL, ambil parameter barcode
+          // Jika content adalah URL, ambil parameter 'b' atau 'barcode'
           const url = new URL(content);
           const params = new URLSearchParams(url.search);
-          if (params.has('barcode')) {
+          if (params.has('b')) {
+            barcodeCode = params.get('b');
+          } else if (params.has('barcode')) {
             barcodeCode = params.get('barcode');
           }
         } catch (e) {
@@ -888,8 +907,8 @@
         const url = getBarcodeUrl(item.barcode);
         JsBarcode("#detailBarcode", url, {
           format: "CODE128",
-          width: 4,
-          height: 100,
+          width: 2,
+          height: 80,
           displayValue: false,
           margin: 10,
           background: "#ffffff",
@@ -1013,7 +1032,8 @@
     // ==================== DEEP LINKING ====================
     function checkUrlForBarcode() {
       const urlParams = new URLSearchParams(window.location.search);
-      const barcode = urlParams.get('barcode');
+      // Cek parameter 'b' atau 'barcode'
+      let barcode = urlParams.get('b') || urlParams.get('barcode');
       if (barcode) {
         const cleanBarcode = barcode.trim().replace(/\s+/g, '');
         const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === cleanBarcode.toLowerCase());
