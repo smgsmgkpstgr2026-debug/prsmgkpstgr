@@ -14,8 +14,8 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <!-- PapaParse (CSV) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <!-- instascan (kamera) - dengan fallback -->
-  <script src="https://cdn.jsdelivr.net/npm/instascan@1.0.0-beta.4/instascan.min.js" onerror="handleInstascanError()"></script>
+  <!-- instascan (kamera) - dengan fallback CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/instascan@1.0.0-beta.4/instascan.min.js" onerror="loadInstascanFallback()"></script>
   <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Firebase SDK (compat) -->
@@ -216,12 +216,28 @@
       return window.location.origin + window.location.pathname + '?b=' + encodeURIComponent(barcodeCode);
     }
 
+    // Fallback jika instascan dari jsdelivr gagal
+    function loadInstascanFallback() {
+      console.warn('Gagal memuat instascan dari jsdelivr, mencoba dari unpkg...');
+      var script = document.createElement('script');
+      script.src = 'https://unpkg.com/instascan@1.0.0-beta.4/dist/instascan.min.js';
+      script.onload = function() {
+        console.log('instascan berhasil dimuat dari unpkg');
+        document.getElementById('cameraStatus').innerHTML = 'Library scanner tersedia. Silakan buka modal scan lagi.';
+      };
+      script.onerror = function() {
+        console.error('Gagal memuat instascan dari kedua CDN');
+        handleInstascanError();
+      };
+      document.head.appendChild(script);
+    }
+
     function handleInstascanError() {
-      console.error('Gagal memuat instascan.min.js');
+      console.error('Instascan tidak dapat dimuat.');
       const statusDiv = document.getElementById('cameraStatus');
       if (statusDiv) {
         statusDiv.className = 'alert alert-warning';
-        statusDiv.innerHTML = 'Library scanner tidak tersedia. Gunakan input manual di bawah.';
+        statusDiv.innerHTML = 'Gagal memuat library scanner. Periksa koneksi internet Anda atau gunakan input manual di bawah.';
       }
     }
 
@@ -747,18 +763,6 @@
         statusDiv.innerHTML = 'Mengakses kamera...';
       }
 
-      // Cek apakah Instascan tersedia
-      if (typeof Instascan === 'undefined') {
-        if (statusDiv) {
-          statusDiv.className = 'alert alert-warning';
-          statusDiv.innerHTML = 'Library scanner tidak tersedia. Gunakan input manual di bawah.';
-        }
-        // Tetap tampilkan modal tanpa kamera
-        scanModalInstance = new bootstrap.Modal(modalEl);
-        scanModalInstance.show();
-        return;
-      }
-
       // Hentikan scanner jika sebelumnya aktif
       if (scanner) {
         scanner.stop();
@@ -792,7 +796,7 @@
       const video = document.getElementById('preview');
       if (!video) return;
 
-      // Cek apakah instascan tersedia (sudah dicek di showScanModal, tapi amankan)
+      // Cek apakah instascan tersedia
       if (typeof Instascan === 'undefined') {
         document.getElementById('cameraStatus').innerHTML = 'Library scanner tidak tersedia. Gunakan input manual.';
         return;
