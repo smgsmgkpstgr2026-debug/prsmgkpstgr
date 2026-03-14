@@ -209,6 +209,12 @@
     let imageOptionModal = null;
     let scanResultModal = null;
 
+    // Fungsi untuk membuat URL dari kode barcode
+    function getBarcodeUrl(barcodeCode) {
+      const baseUrl = window.location.origin + window.location.pathname;
+      return baseUrl + '?barcode=' + encodeURIComponent(barcodeCode);
+    }
+
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
       itemsListener = db.collection('items').onSnapshot(snapshot => {
@@ -471,7 +477,8 @@
         items.forEach(item => {
           const svg = document.getElementById(`barcode-${item.id}`);
           if (svg) {
-            JsBarcode(svg, item.barcode, { format: "CODE128", width: 2, height: 40, displayValue: false });
+            const url = getBarcodeUrl(item.barcode);
+            JsBarcode(svg, url, { format: "CODE128", width: 2, height: 40, displayValue: false });
           }
         });
       }, 100);
@@ -737,8 +744,8 @@
       
       scanner = new Instascan.Scanner({ video, scanPeriod: 5, refractoryPeriod: 100 });
       scanner.addListener('scan', function (content) {
-        // Bersihkan hasil scan
-        const cleanContent = content.trim().replace(/\s+/g, '');
+        // Bersihkan hasil scan (trim spasi)
+        const cleanContent = content.trim();
         console.log('Barcode terdeteksi:', cleanContent);
         
         // Tampilkan di layar
@@ -747,10 +754,26 @@
         // Hentikan scanner
         scanner.stop();
         
+        // Parse URL untuk mendapatkan kode barcode asli
+        let barcodeCode = null;
+        try {
+          const url = new URL(cleanContent);
+          const params = new URLSearchParams(url.search);
+          barcodeCode = params.get('barcode');
+        } catch (e) {
+          // Jika bukan URL, anggap sebagai kode langsung (misal input manual atau barcode teks biasa)
+          barcodeCode = cleanContent.replace(/\s+/g, '');
+        }
+
+        if (!barcodeCode) {
+          alert('Format barcode tidak dikenal');
+          return;
+        }
+
         // Cari item di database
         const item = items.find(i => {
           const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
-          return itemBarcode.toLowerCase() === cleanContent.toLowerCase();
+          return itemBarcode.toLowerCase() === barcodeCode.toLowerCase();
         });
         
         if (item) {
@@ -809,7 +832,7 @@
       document.getElementById('scanBarcodeValue').innerText = item.barcode;
       document.getElementById('scanItemName').innerText = item.name;
       
-      const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
+      const url = getBarcodeUrl(item.barcode);
       document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
       
       // Tampilkan modal
@@ -830,7 +853,7 @@
     function generateQRCode(barcode) {
       const container = document.getElementById('qrContainer');
       container.innerHTML = '';
-      const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(barcode);
+      const url = getBarcodeUrl(barcode);
       new QRCode(container, { text: url, width: 150, height: 150 });
     }
 
@@ -852,7 +875,8 @@
         </div>
       `;
       setTimeout(() => {
-        JsBarcode("#detailBarcode", item.barcode, { format: "CODE128", width: 2, height: 40 });
+        const url = getBarcodeUrl(item.barcode);
+        JsBarcode("#detailBarcode", url, { format: "CODE128", width: 2, height: 40 });
       }, 50);
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
     }
