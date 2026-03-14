@@ -731,29 +731,48 @@
       
       scanner = new Instascan.Scanner({ video, scanPeriod: 5, refractoryPeriod: 100 });
       scanner.addListener('scan', function (content) {
-        // Tampilkan alert untuk debugging (opsional, bisa dihapus jika sudah stabil)
-        // alert('Barcode terdeteksi: ' + content);
-        console.log('Barcode terdeteksi:', content);
-        document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
+        // Bersihkan hasil scan dari karakter yang tidak diinginkan
+        const cleanContent = content.trim().replace(/\s+/g, '');
+        console.log('Barcode terdeteksi (asli):', content);
+        console.log('Barcode terdeteksi (bersih):', cleanContent);
+        
+        document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${cleanContent}</span>`;
         scanner.stop();
         
-        // Cari item berdasarkan barcode (case insensitive)
-        const item = items.find(i => i.barcode.trim().toLowerCase() === content.trim().toLowerCase());
+        // Debug: tampilkan semua barcode yang ada di database
+        console.log('Semua barcode di database:', items.map(i => i.barcode));
+        
+        // Cari item dengan pencarian fleksibel
+        const item = items.find(i => {
+          const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
+          return itemBarcode.toLowerCase() === cleanContent.toLowerCase();
+        });
+        
         if (item) {
           console.log('Item ditemukan:', item);
           bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
           showScanResultModal(item);
         } else {
-          console.log('Item tidak ditemukan untuk barcode:', content);
-          alert('Barang dengan barcode ' + content + ' tidak ditemukan.');
-          // Opsional: restart scanner setelah alert
-          // initScanner();
+          console.log('Item tidak ditemukan. Mencoba pencarian parsial...');
+          // Coba cari dengan awalan (jika barcode tidak lengkap)
+          const partialItem = items.find(i => 
+            i.barcode.toLowerCase().includes(cleanContent.toLowerCase()) ||
+            cleanContent.toLowerCase().includes(i.barcode.toLowerCase())
+          );
+          
+          if (partialItem) {
+            console.log('Item ditemukan (pencarian parsial):', partialItem);
+            bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
+            showScanResultModal(partialItem);
+          } else {
+            alert('Barang dengan barcode ' + cleanContent + ' tidak ditemukan.\n\nBarcode yang tersedia: ' + 
+                  items.map(i => i.barcode).join(', '));
+          }
         }
       });
 
       Instascan.Camera.getCameras().then(function (cameras) {
         if (cameras.length > 0) {
-          // Prioritaskan kamera belakang
           const backCamera = cameras.find(c => c.name.toLowerCase().includes('back')) || cameras[0];
           scanner.start(backCamera);
         } else {
@@ -768,15 +787,22 @@
     function manualScan() {
       const code = document.getElementById('manualBarcode').value.trim();
       if (!code) return alert('Masukkan kode');
-      console.log('Manual scan:', code);
-      const item = items.find(i => i.barcode.trim().toLowerCase() === code.trim().toLowerCase());
+      
+      const cleanCode = code.replace(/\s+/g, '');
+      console.log('Manual scan (asli):', code);
+      console.log('Manual scan (bersih):', cleanCode);
+      
+      const item = items.find(i => {
+        const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
+        return itemBarcode.toLowerCase() === cleanCode.toLowerCase();
+      });
+      
       if (item) {
         console.log('Item ditemukan:', item);
         bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
         showScanResultModal(item);
       } else {
-        console.log('Item tidak ditemukan untuk kode:', code);
-        alert('Barang tidak ditemukan');
+        alert('Barang dengan kode ' + cleanCode + ' tidak ditemukan.');
       }
     }
 
@@ -785,7 +811,6 @@
       console.log('Menampilkan modal hasil scan untuk item:', item);
       lastScannedItem = item;
       document.getElementById('scanItemName').innerText = item.name;
-      // Buat URL lengkap dengan parameter barcode
       const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
       document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
       if (!scanResultModal) {
@@ -948,10 +973,12 @@
       const urlParams = new URLSearchParams(window.location.search);
       const barcode = urlParams.get('barcode');
       if (barcode) {
-        // Cari item berdasarkan barcode
-        const item = items.find(i => i.barcode.trim().toLowerCase() === barcode.trim().toLowerCase());
+        const cleanBarcode = barcode.trim().replace(/\s+/g, '');
+        const item = items.find(i => {
+          const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
+          return itemBarcode.toLowerCase() === cleanBarcode.toLowerCase();
+        });
         if (item) {
-          // Tampilkan detail setelah halaman dimuat
           setTimeout(() => displayItemDetailModal(item), 500);
         } else {
           alert('Barang dengan barcode ' + barcode + ' tidak ditemukan.');
