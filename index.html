@@ -731,17 +731,19 @@
       
       scanner = new Instascan.Scanner({ video, scanPeriod: 5, refractoryPeriod: 100 });
       scanner.addListener('scan', function (content) {
-        console.log('Barcode terdeteksi:', content); // DEBUG
+        // Tampilkan alert untuk debugging (agar user tahu bahwa barcode terbaca)
+        alert('Barcode terdeteksi: ' + content);
+        console.log('Barcode terdeteksi:', content);
         document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
         scanner.stop();
         const item = items.find(i => i.barcode.trim().toLowerCase() === content.trim().toLowerCase());
         if (item) {
-          console.log('Item ditemukan:', item); // DEBUG
+          console.log('Item ditemukan:', item);
           bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
           showScanResultModal(item);
         } else {
-          console.log('Item tidak ditemukan untuk barcode:', content); // DEBUG
-          alert('Barang tidak ditemukan');
+          console.log('Item tidak ditemukan untuk barcode:', content);
+          alert('Barang dengan barcode ' + content + ' tidak ditemukan.');
         }
       });
 
@@ -752,27 +754,30 @@
         } else {
           alert('Kamera tidak ditemukan. Gunakan input manual.');
         }
-      }).catch(console.error);
+      }).catch(function (err) {
+        console.error('Kamera error:', err);
+        alert('Gagal mengakses kamera: ' + err.message);
+      });
     }
 
     function manualScan() {
       const code = document.getElementById('manualBarcode').value.trim();
       if (!code) return alert('Masukkan kode');
-      console.log('Manual scan:', code); // DEBUG
+      console.log('Manual scan:', code);
       const item = items.find(i => i.barcode.trim().toLowerCase() === code.trim().toLowerCase());
       if (item) {
-        console.log('Item ditemukan:', item); // DEBUG
+        console.log('Item ditemukan:', item);
         bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
         showScanResultModal(item);
       } else {
-        console.log('Item tidak ditemukan untuk kode:', code); // DEBUG
+        console.log('Item tidak ditemukan untuk kode:', code);
         alert('Barang tidak ditemukan');
       }
     }
 
     // Fungsi untuk menampilkan modal hasil scan dengan link
     function showScanResultModal(item) {
-      console.log('Menampilkan modal hasil scan untuk item:', item); // DEBUG
+      console.log('Menampilkan modal hasil scan untuk item:', item);
       lastScannedItem = item;
       document.getElementById('scanItemName').innerText = item.name;
       const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
