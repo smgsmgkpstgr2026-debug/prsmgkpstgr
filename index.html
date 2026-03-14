@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>Aplikasi Inventory & Peminjaman</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- JsBarcode -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- SheetJS (XLSX) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- PapaParse (CSV) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- instascan (kamera) -->
+  <script src="https://cdn.jsdelivr.net/npm/instascan@1.0.0-beta.4/instascan.min.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { background-color: #f8f9fa; }
+    .navbar { background-color: #0d6efd; }
+    .navbar-brand, .nav-link { color: white !important; }
+    .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .barcode-img { max-width: 200px; height: auto; cursor: pointer; }
+    #scanner-container { position: relative; }
+    #preview { width: 100%; max-height: 300px; object-fit: cover; }
+    .hidden { display: none; }
+    .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
+    #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand" href="#"><i class="fas fa-boxes me-2"></i>Inv&Pinjam</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto" id="navLinks">
+          <!-- akan diisi oleh javascript -->
+        </ul>
+        <span class="navbar-text text-white me-3" id="userDisplay"></span>
+        <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Konten Utama -->
+  <div class="container mt-4" id="app">
+    <div id="pageContent"></div>
+  </div>
+
+  <!-- Modal untuk scan barcode -->
+  <div class="modal fade" id="scanModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Scan Barcode</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <video id="preview" style="width:100%;"></video>
+          <div class="mt-2 text-center" id="scanResult"></div>
+          <!-- Tambahan input manual -->
+          <div class="mt-3">
+            <label>Atau masukkan kode manual:</label>
+            <input type="text" id="manualBarcode" class="form-control" placeholder="Ketik kode barcode">
+            <button class="btn btn-secondary mt-2" onclick="manualScan()">Cari</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal untuk detail hasil scan / klik barcode -->
+  <div class="modal fade" id="itemDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Detail Barang</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="itemDetailBody">
+          ...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (untuk modal) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ==================== DATA STORAGE ====================
+    const STORAGE_KEYS = {
+      ITEMS: 'inventory_items',
+      USERS: 'inventory_users',
+      BORROW_REQUESTS: 'borrow_requests',
+      CURRENT_USER: 'current_user'
+    };
+
+    // Inisialisasi data default
+    function initData() {
+      if (!localStorage.getItem(STORAGE_KEYS.ITEMS)) {
+        localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify([
+          { id: '1', name: 'Laptop Dell', category: 'Elektronik', quantity: 10, location: 'Rak A1', barcode: 'INV-001', image: '' },
+          { id: '2', name: 'Proyektor', category: 'Elektronik', quantity: 5, location: 'Rak A2', barcode: 'INV-002', image: '' },
+        ]));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+        // Role: admin / borrower
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([
+          { id: 'u1', name: 'Admin', email: 'admin@inv.com', password: 'admin', role: 'admin' },
+          { id: 'u2', name: 'Borrower', email: 'user@inv.com', password: 'user', role: 'borrower' }
+        ]));
+      }
+      if (!localStorage.getItem(STORAGE_KEYS.BORROW_REQUESTS)) {
+        localStorage.setItem(STORAGE_KEYS.BORROW_REQUESTS, JSON.stringify([]));
+      }
+    }
+    initData();
+
+    // Helper: get data
+    function getItems() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.ITEMS)); }
+    function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)); }
+    function getRequests() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.BORROW_REQUESTS)); }
+    function saveItems(items) { localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items)); }
+    function saveRequests(requests) { localStorage.setItem(STORAGE_KEYS.BORROW_REQUESTS, JSON.stringify(requests)); }
+    function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
+    function setCurrentUser(user) { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)); }
+
+    // ==================== ROUTING & UI ====================
+    let currentPage = 'login';
+
+    function renderNav() {
+      const user = getCurrentUser();
+      const navLinks = document.getElementById('navLinks');
+      const userDisplay = document.getElementById('userDisplay');
+      if (user) {
+        userDisplay.innerText = `Halo, ${user.name} (${user.role === 'admin' ? 'Admin' : 'Peminjam'})`;
+        let links = '';
+        if (user.role === 'admin') {
+          links = `
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowRequests')">Permintaan</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('history')">Riwayat</a></li>
+          `;
+        } else {
+          links = `
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowForm')">Pinjam Barang</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>
+          `;
+        }
+        navLinks.innerHTML = links;
+      } else {
+        userDisplay.innerText = '';
+        navLinks.innerHTML = '';
+      }
+    }
+
+    function navigate(page) {
+      // Cek jika page borrowForm dan tidak ada user, maka arahkan ke login dengan pesan
+      if (page === 'borrowForm' && !getCurrentUser()) {
+        alert('Anda harus login terlebih dahulu. Jika belum punya akun, silakan hubungi Pengurus GSM.');
+        currentPage = 'login';
+      } else {
+        currentPage = page;
+      }
+      renderPage();
+    }
+
+    function renderPage() {
+      const user = getCurrentUser();
+      if (!user && currentPage !== 'login') {
+        currentPage = 'login';
+      }
+      const content = document.getElementById('pageContent');
+      if (currentPage === 'login') {
+        content.innerHTML = renderLogin();
+      } else if (currentPage === 'inventory') {
+        content.innerHTML = renderInventory();
+      } else if (currentPage === 'borrowForm') {
+        content.innerHTML = renderBorrowForm();
+      } else if (currentPage === 'myBorrows') {
+        content.innerHTML = renderMyBorrows();
+      } else if (currentPage === 'borrowRequests') {
+        content.innerHTML = renderBorrowRequests();
+      } else if (currentPage === 'history') {
+        content.innerHTML = renderHistory();
+      }
+      renderNav();
+    }
+
+    // ==================== LOGIN ====================
+    function renderLogin() {
+      return `
+        <div class="row justify-content-center">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-header bg-primary text-white">Login</div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <label>Email</label>
+                  <input type="email" id="loginEmail" class="form-control" value="admin@inv.com">
+                </div>
+                <div class="mb-3">
+                  <label>Password</label>
+                  <input type="password" id="loginPassword" class="form-control" value="admin">
+                </div>
+                <button class="btn btn-primary w-100" onclick="doLogin()">Login</button>
+                <hr>
+                <p class="text-muted">Gunakan: admin@inv.com / admin (admin) atau user@inv.com / user (peminjam)</p>
+                <p class="text-muted">Belum punya akun? Hubungi Pengurus GSM untuk registrasi.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function doLogin() {
+      const email = document.getElementById('loginEmail').value;
+      const pass = document.getElementById('loginPassword').value;
+      const users = getUsers();
+      const user = users.find(u => u.email === email && u.password === pass);
+      if (user) {
+        setCurrentUser({ id: user.id, name: user.name, email: user.email, role: user.role });
+        navigate('inventory');
+      } else {
+        alert('Email atau password salah');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      navigate('login');
+    }
+
+    // ==================== INVENTORY (Admin & Lihat) ====================
+    function renderInventory() {
+      const user = getCurrentUser();
+      const items = getItems();
+      let html = `
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3>Daftar Inventory</h3>
+          <div>
+            <button class="btn btn-outline-primary me-2" onclick="showScanModal()"><i class="fas fa-camera"></i> Scan</button>
+      `;
+      if (user && user.role === 'admin') {
+        html += `
+            <button class="btn btn-primary" onclick="showAddItemModal()"><i class="fas fa-plus"></i> Tambah</button>
+            <button class="btn btn-success" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import</button>
+        `;
+      }
+      html += `
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Nama</th><th>Kategori</th><th>Stok</th><th>Lokasi</th><th>Barcode</th>
+                ${user && user.role === 'admin' ? '<th>Aksi</th>' : ''}
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      items.forEach(item => {
+        html += `<tr>
+          <td>${item.name}</td>
+          <td>${item.category}</td>
+          <td>${item.quantity}</td>
+          <td>${item.location}</td>
+          <td>
+            <svg class="barcode-img" id="barcode-${item.id}" data-id="${item.id}" onclick="showItemDetail('${item.id}')"></svg>
+            <br><small>${item.barcode}</small>
+          </td>
+          ${user && user.role === 'admin' ? `<td>
+            <button class="btn btn-sm btn-warning" onclick="editItem('${item.id}')"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="deleteItem('${item.id}')"><i class="fas fa-trash"></i></button>
+          </td>` : ''}
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+      // Render barcode setelah tabel masuk DOM
+      setTimeout(() => {
+        items.forEach(item => {
+          const svg = document.getElementById(`barcode-${item.id}`);
+          if (svg) {
+            JsBarcode(svg, item.barcode, { format: "CODE128", lineColor: "#000", width: 2, height: 40, displayValue: false });
+          }
+        });
+      }, 100);
+      return html;
+    }
+
+    // Fungsi untuk menampilkan detail item berdasarkan ID (dari klik barcode)
+    function showItemDetail(itemId) {
+      const items = getItems();
+      const item = items.find(i => i.id === itemId);
+      if (item) {
+        displayItemDetailModal(item);
+      }
+    }
+
+    // Admin: tambah item dengan gambar
+    function showAddItemModal() {
+      const name = prompt('Nama Barang:');
+      if (!name) return;
+      const category = prompt('Kategori:');
+      const quantity = parseInt(prompt('Jumlah:') || '0');
+      const location = prompt('Lokasi:');
+      // Tanya gambar: bisa URL atau upload
+      const imageOption = prompt('Masukkan URL gambar atau ketik "upload" untuk pilih file:');
+      let image = '';
+      if (imageOption && imageOption.toLowerCase() === 'upload') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              image = event.target.result; // base64
+              saveNewItem(name, category, quantity, location, image);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            saveNewItem(name, category, quantity, location, '');
+          }
+        };
+        input.click();
+      } else {
+        image = imageOption || '';
+        saveNewItem(name, category, quantity, location, image);
+      }
+    }
+
+    function saveNewItem(name, category, quantity, location, image) {
+      const items = getItems();
+      const newId = Date.now().toString();
+      const barcode = 'INV-' + Math.floor(Math.random()*10000);
+      items.push({ id: newId, name, category, quantity, location, barcode, image });
+      saveItems(items);
+      renderPage();
+    }
+
+    function editItem(id) {
+      const items = getItems();
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+      const newName = prompt('Nama Barang:', item.name);
+      if (newName) item.name = newName;
+      const newCat = prompt('Kategori:', item.category);
+      if (newCat) item.category = newCat;
+      const newQty = parseInt(prompt('Jumlah:', item.quantity));
+      if (!isNaN(newQty)) item.quantity = newQty;
+      const newLoc = prompt('Lokasi:', item.location);
+      if (newLoc) item.location = newLoc;
+      // Edit gambar
+      const newImage = prompt('URL gambar baru (kosongkan jika tidak berubah, ketik "hapus" untuk hapus):', item.image);
+      if (newImage === 'hapus') {
+        item.image = '';
+      } else if (newImage) {
+        item.image = newImage;
+      }
+      saveItems(items);
+      renderPage();
+    }
+
+    function deleteItem(id) {
+      if (!confirm('Hapus barang?')) return;
+      let items = getItems().filter(i => i.id !== id);
+      saveItems(items);
+      renderPage();
+    }
+
+    // ==================== IMPORT ====================
+    function showImportModal() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.xlsx,.xls,.csv,.txt';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const ext = file.name.split('.').pop().toLowerCase();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          if (ext === 'csv' || ext === 'txt') {
+            Papa.parse(ev.target.result, {
+              header: true,
+              complete: (result) => {
+                importData(result.data);
+              }
+            });
+          } else {
+            const workbook = XLSX.read(ev.target.result, { type: 'binary' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json(sheet);
+            importData(data);
+          }
+        };
+        if (ext === 'csv' || ext === 'txt') {
+          reader.readAsText(file);
+        } else {
+          reader.readAsBinaryString(file);
+        }
+      };
+      input.click();
+    }
+
+    function importData(rows) {
+      const items = getItems();
+      rows.forEach((row, idx) => {
+        if (!row.name) return;
+        const newItem = {
+          id: Date.now() + idx + '',
+          name: row.name,
+          category: row.category || 'Umum',
+          quantity: parseInt(row.quantity) || 0,
+          location: row.location || 'Gudang',
+          barcode: 'INV-' + Math.floor(Math.random()*10000) + idx,
+          image: row.image || ''
+        };
+        items.push(newItem);
+      });
+      saveItems(items);
+      alert('Import selesai');
+      renderPage();
+    }
+
+    // ==================== SCAN ====================
+    let scanner = null;
+    function showScanModal() {
+      const modal = new bootstrap.Modal(document.getElementById('scanModal'));
+      modal.show();
+      setTimeout(initScanner, 500);
+    }
+
+    function initScanner() {
+      if (scanner) scanner.stop();
+      const video = document.getElementById('preview');
+      if (!video) return;
+      
+      scanner = new Instascan.Scanner({ 
+        video: video, 
+        scanPeriod: 5,
+        refractoryPeriod: 100
+      });
+      
+      scanner.addListener('scan', function (content) {
+        console.log('Barcode terdeteksi:', content);
+        document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
+        scanner.stop();
+        
+        const items = getItems();
+        const item = items.find(i => i.barcode.trim().toLowerCase() === content.trim().toLowerCase());
+        
+        if (item) {
+          const scanModalEl = document.getElementById('scanModal');
+          const scanModal = bootstrap.Modal.getInstance(scanModalEl);
+          if (scanModal) scanModal.hide();
+          displayItemDetailModal(item);
+        } else {
+          alert(`Barang dengan barcode "${content}" tidak ditemukan.`);
+        }
+      });
+
+      Instascan.Camera.getCameras().then(function (cameras) {
+        if (cameras.length > 0) {
+          const backCamera = cameras.find(c => c.name.toLowerCase().includes('back')) || cameras[0];
+          scanner.start(backCamera);
+          console.log('Scanner started with camera:', backCamera.name);
+        } else {
+          alert('Kamera tidak ditemukan. Gunakan input manual.');
+        }
+      }).catch(function (e) {
+        console.error('Gagal mengakses kamera:', e);
+        alert('Gagal mengakses kamera: ' + e.message);
+      });
+    }
+
+    function manualScan() {
+      const code = document.getElementById('manualBarcode').value.trim();
+      if (!code) {
+        alert('Masukkan kode barcode');
+        return;
+      }
+      const items = getItems();
+      const item = items.find(i => i.barcode.trim().toLowerCase() === code.trim().toLowerCase());
+      if (item) {
+        displayItemDetailModal(item);
+        bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
+      } else {
+        alert('Barang tidak ditemukan');
+      }
+    }
+
+    // Fungsi untuk generate QR code berdasarkan barcode
+    function generateQRCode(barcode) {
+      const container = document.getElementById('qrContainer');
+      if (!container) return;
+      // Hapus QR sebelumnya
+      container.innerHTML = '';
+      // Buat URL lengkap dengan parameter barcode
+      const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(barcode);
+      new QRCode(container, {
+        text: url,
+        width: 150,
+        height: 150
+      });
+    }
+
+    function displayItemDetailModal(item) {
+      const modalBody = document.getElementById('itemDetailBody');
+      if (!modalBody) return;
+      
+      modalBody.innerHTML = `
+        <div class="text-center mb-3">
+          ${item.image ? `<img src="${item.image}" class="item-image" alt="${item.name}" style="max-width:100%; max-height:200px; object-fit:contain;" onerror="this.onerror=null; this.src=''; this.alt='Gambar tidak tersedia';">` : '<div class="alert alert-secondary">Tidak ada gambar</div>'}
+        </div>
+        <p><strong>Nama:</strong> ${item.name}</p>
+        <p><strong>Kategori:</strong> ${item.category}</p>
+        <p><strong>Stok:</strong> ${item.quantity}</p>
+        <p><strong>Lokasi:</strong> ${item.location}</p>
+        <p><strong>Barcode:</strong> ${item.barcode}</p>
+        <svg id="detailBarcode" style="width:100%"></svg>
+        <div class="text-center mt-3">
+          <button class="btn btn-sm btn-info" onclick="generateQRCode('${item.barcode}')">Tampilkan QR Code</button>
+          <div id="qrContainer" style="margin-top:10px;"></div>
+        </div>
+      `;
+      
+      setTimeout(() => {
+        const svg = document.getElementById('detailBarcode');
+        if (svg) {
+          JsBarcode(svg, item.barcode, { format: "CODE128", width: 2, height: 40 });
+        }
+      }, 50);
+      
+      const modalEl = document.getElementById('itemDetailModal');
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+
+    // Fungsi untuk membaca parameter dari URL (deep linking)
+    function checkUrlForBarcode() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const barcode = urlParams.get('barcode');
+      if (barcode) {
+        // Cari barang berdasarkan barcode
+        const items = getItems();
+        const item = items.find(i => i.barcode.trim().toLowerCase() === barcode.trim().toLowerCase());
+        if (item) {
+          // Tampilkan modal detail setelah halaman siap
+          setTimeout(() => displayItemDetailModal(item), 500);
+        } else {
+          alert('Barang dengan barcode ' + barcode + ' tidak ditemukan.');
+        }
+      }
+    }
+
+    // ==================== PEMINJAMAN ====================
+    // Form peminjaman (untuk borrower)
+    function renderBorrowForm() {
+      const user = getCurrentUser();
+      if (!user) {
+        return '<div class="alert alert-warning">Anda harus login terlebih dahulu. <a href="#" onclick="navigate(\'login\')">Login</a></div>';
+      }
+      const items = getItems();
+      let options = '<option value="">Pilih Barang</option>';
+      items.forEach(i => options += `<option value="${i.id}" data-max="${i.quantity}">${i.name} (stok ${i.quantity})</option>`);
+      return `
+        <div class="card">
+          <div class="card-header bg-primary text-white">Form Peminjaman</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label>Nama Peminjam</label>
+              <input type="text" id="borrowerName" class="form-control" value="${user.name}" readonly>
+            </div>
+            <div class="mb-3">
+              <label>Barang</label>
+              <select id="borrowItem" class="form-select">${options}</select>
+            </div>
+            <div class="mb-3">
+              <label>Jumlah</label>
+              <input type="number" id="borrowQty" class="form-control" min="1">
+            </div>
+            <div class="mb-3">
+              <label>Tanggal Pinjam</label>
+              <input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}">
+            </div>
+            <div class="mb-3">
+              <label>Rencana Kembali</label>
+              <input type="date" id="returnDate" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label>Keperluan</label>
+              <textarea id="purpose" class="form-control" rows="2"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="submitBorrow()">Ajukan Peminjaman</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function submitBorrow() {
+      const user = getCurrentUser();
+      if (!user) {
+        alert('Silakan login terlebih dahulu.');
+        return;
+      }
+      const itemId = document.getElementById('borrowItem').value;
+      if (!itemId) return alert('Pilih barang');
+      const item = getItems().find(i => i.id === itemId);
+      const qty = parseInt(document.getElementById('borrowQty').value);
+      if (qty <= 0 || qty > item.quantity) return alert('Jumlah tidak valid atau melebihi stok');
+      const borrowDate = document.getElementById('borrowDate').value;
+      const returnDate = document.getElementById('returnDate').value;
+      if (!borrowDate || !returnDate) return alert('Isi tanggal');
+      const purpose = document.getElementById('purpose').value;
+      const requests = getRequests();
+      const newReq = {
+        id: Date.now().toString(),
+        itemId: itemId,
+        itemName: item.name,
+        borrowerId: user.id,
+        borrowerName: user.name,
+        quantity: qty,
+        borrowDate: borrowDate,
+        returnDate: returnDate,
+        purpose: purpose,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      requests.push(newReq);
+      saveRequests(requests);
+      alert('Permintaan diajukan, menunggu persetujuan admin');
+      navigate('myBorrows');
+    }
+
+    // Daftar peminjaman user (peminjam)
+    function renderMyBorrows() {
+      const user = getCurrentUser();
+      if (!user) return '<div class="alert alert-warning">Silakan login.</div>';
+      const requests = getRequests().filter(r => r.borrowerId === user.id);
+      let html = '<h3>Peminjamanku</h3>';
+      if (requests.length === 0) return html + '<p>Belum ada peminjaman.</p>';
+      html += '<table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>';
+      requests.forEach(r => {
+        let statusClass = '';
+        if (r.status === 'approved') statusClass = 'text-success';
+        else if (r.status === 'rejected') statusClass = 'text-danger';
+        else statusClass = 'text-warning';
+        html += `<tr>
+          <td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td>
+          <td class="${statusClass}">${r.status}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    // Admin: daftar permintaan
+    function renderBorrowRequests() {
+      const requests = getRequests().filter(r => r.status === 'pending');
+      let html = '<h3>Permintaan Pending</h3>';
+      if (requests.length === 0) return html + '<p>Tidak ada permintaan.</p>';
+      html += '<table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Aksi</th></tr></thead><tbody>';
+      requests.forEach(r => {
+        html += `<tr>
+          <td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td>
+          <td>
+            <button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button>
+            <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button>
+          </td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function approveRequest(reqId) {
+      const requests = getRequests();
+      const req = requests.find(r => r.id === reqId);
+      if (!req) return;
+      const items = getItems();
+      const item = items.find(i => i.id === req.itemId);
+      if (item.quantity < req.quantity) {
+        alert('Stok tidak cukup!');
+        return;
+      }
+      item.quantity -= req.quantity;
+      req.status = 'approved';
+      saveItems(items);
+      saveRequests(requests);
+      alert('Permintaan disetujui. Notifikasi dikirim ke peminjam (simulasi).');
+      renderPage();
+    }
+
+    function rejectRequest(reqId) {
+      const requests = getRequests();
+      const req = requests.find(r => r.id === reqId);
+      if (req) {
+        req.status = 'rejected';
+        saveRequests(requests);
+        alert('Permintaan ditolak. Notifikasi dikirim.');
+        renderPage();
+      }
+    }
+
+    // Riwayat semua peminjaman (admin)
+    function renderHistory() {
+      const requests = getRequests();
+      let html = '<h3>Riwayat Peminjaman</h3>';
+      if (requests.length === 0) return html + '<p>Belum ada data.</p>';
+      html += '<table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>';
+      requests.forEach(r => {
+        html += `<tr>
+          <td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td>
+          <td>${r.status}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      return html;
+    }
+
+    // ==================== INIT ====================
+    window.onload = () => {
+      if (getCurrentUser()) {
+        navigate('inventory');
+      } else {
+        navigate('login');
+      }
+      // Cek parameter URL setelah halaman dimuat
+      checkUrlForBarcode();
+    };
+  </script>
+</body>
+</html>
