@@ -30,7 +30,7 @@
     #preview { width: 100%; max-height: 300px; object-fit: cover; }
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
     #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
-    .upload-loading { display: none; }
+    #hiddenFileInput { display: none; }
   </style>
 </head>
 <body>
@@ -88,6 +88,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Hidden file input untuk upload -->
+  <input type="file" id="hiddenFileInput" accept="image/*">
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script>
@@ -409,65 +412,69 @@
     }
 
     // ==================== FUNGSI UPLOAD DAN TAMBAH ITEM ====================
-    // Fungsi untuk membuat input file secara dinamis
-    function createFileInput(callback) {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
-      document.body.appendChild(input);
+    // Variabel untuk menyimpan data sementara saat upload
+    let pendingItemData = null;
+
+    // Setup hidden file input
+    const fileInput = document.getElementById('hiddenFileInput');
+    fileInput.onchange = async function(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        pendingItemData = null;
+        return;
+      }
       
-      input.onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) {
-          alert('Tidak ada file dipilih.');
-          document.body.removeChild(input);
-          return;
-        }
-        
-        // Tampilkan loading
-        alert('Mengupload gambar, harap tunggu...');
-        
-        try {
-          const imageUrl = await uploadImage(file);
-          document.body.removeChild(input);
-          callback(imageUrl);
-        } catch (error) {
-          console.error('Error upload:', error);
-          alert('Gagal upload gambar: ' + error.message);
-          document.body.removeChild(input);
-          callback(null);
-        }
-      };
+      if (!pendingItemData) {
+        alert('Terjadi kesalahan: data barang tidak ditemukan.');
+        return;
+      }
       
-      // Trigger click
-      input.click();
-    }
+      // Tampilkan loading
+      alert('Mengupload gambar, harap tunggu...');
+      
+      try {
+        const imageUrl = await uploadImage(file);
+        const { name, category, quantity, location } = pendingItemData;
+        await saveNewItem(name, category, quantity, location, imageUrl);
+      } catch (error) {
+        console.error('Error upload:', error);
+        alert('Gagal upload gambar. Barang tetap disimpan tanpa gambar.');
+        const { name, category, quantity, location } = pendingItemData;
+        await saveNewItem(name, category, quantity, location, '');
+      } finally {
+        pendingItemData = null;
+        // Reset file input
+        fileInput.value = '';
+      }
+    };
 
     function showAddItemModal() {
       const name = prompt('Nama Barang:');
       if (!name) return;
       
       const category = prompt('Kategori:');
-      if (!category) return;
+      if (category === null) return;
       
       const quantity = parseInt(prompt('Jumlah:') || '0');
       if (isNaN(quantity)) return;
       
       const location = prompt('Lokasi:');
-      if (!location) return;
+      if (location === null) return;
       
-      const imageOption = prompt('Masukkan URL gambar, ketik "upload" untuk pilih file, atau kosongkan jika tidak ada gambar:');
+      const imageOption = prompt(
+        'PILIHAN GAMBAR:\n' +
+        '- Ketik "upload" untuk memilih file dari komputer\n' +
+        '- Masukkan URL gambar (contoh: https://...)\n' +
+        '- Kosongkan jika tidak ada gambar'
+      );
       
       if (imageOption && imageOption.toLowerCase() === 'upload') {
-        createFileInput(async (imageUrl) => {
-          if (imageUrl) {
-            await saveNewItem(name, category, quantity, location, imageUrl);
-          } else {
-            await saveNewItem(name, category, quantity, location, '');
-          }
-        });
+        // Simpan data sementara
+        pendingItemData = { name, category, quantity, location };
+        // Trigger file input
+        setTimeout(() => fileInput.click(), 100);
       } else {
+        // Simpan dengan URL atau tanpa gambar
         saveNewItem(name, category, quantity, location, imageOption || '');
       }
     }
@@ -513,13 +520,48 @@
         await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
         alert('Barang berhasil diupdate!');
       } else if (newImage === 'upload') {
-        createFileInput(async (imageUrl) => {
-          if (imageUrl) {
+        // Simpan data untuk edit
+        pendingItemData = { 
+          name: item.name, 
+          category: item.category, 
+          quantity: item.quantity, 
+          location: item.location 
+        };
+        
+        // Override save function untuk update
+        const originalSave = saveNewItem;
+        window.saveNewItem = async (name, category, quantity, location, imageUrl) => {
+          item.image = imageUrl;
+          await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
+          alert('Barang berhasil diupdate!');
+          window.saveNewItem = originalSave;
+        };
+        
+        fileInput.onchange = async function(e) {
+          const file = e.target.files[0];
+          if (!file) {
+            window.saveNewItem = originalSave;
+            return;
+          }
+          
+          alert('Mengupload gambar, harap tunggu...');
+          
+          try {
+            const imageUrl = await uploadImage(file);
             item.image = imageUrl;
             await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
             alert('Barang berhasil diupdate!');
+          } catch (error) {
+            console.error('Error upload:', error);
+            alert('Gagal upload gambar.');
+          } finally {
+            window.saveNewItem = originalSave;
+            fileInput.value = '';
           }
-        });
+        };
+        
+        setTimeout(() => fileInput.click(), 100);
+        
       } else if (newImage) {
         item.image = newImage;
         await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
