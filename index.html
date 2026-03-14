@@ -26,16 +26,14 @@
     .navbar { background-color: #0d6efd; }
     .navbar-brand, .nav-link { color: white !important; }
     .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .barcode-img { max-width: 100%; height: auto; cursor: pointer; display: block; margin: 0 auto; }
+    .barcode-img { max-width: 100%; height: auto; cursor: pointer; display: block; margin: 0 auto; background: #fff; padding: 5px; border-radius: 4px; }
     #preview { width: 100%; max-height: 300px; object-fit: cover; background: #000; }
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
     #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
     #hiddenFileInput { display: none; }
     .scan-link { word-break: break-all; }
     .scan-result-card { cursor: pointer; transition: all 0.2s; }
-    .scan-result-card:hover { background-color: #f0f0f0; }
-    /* Perbesar area barcode agar mudah discan */
-    .barcode-wrapper { text-align: center; padding: 5px; background: #fff; border-radius: 4px; }
+    .barcode-wrapper { text-align: center; padding: 5px; background: #fff; border-radius: 4px; display: inline-block; }
   </style>
 </head>
 <body>
@@ -211,9 +209,8 @@
     let imageOptionModal = null;
     let scanResultModal = null;
 
-    // Fungsi untuk membuat URL dari kode barcode (lebih pendek hanya dengan query)
+    // Fungsi untuk membuat URL dari kode barcode
     function getBarcodeUrl(barcodeCode) {
-      // Gunakan hanya pathname dan query, tanpa hash
       return window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(barcodeCode);
     }
 
@@ -482,14 +479,14 @@
           const svg = document.getElementById(`barcode-${item.id}`);
           if (svg) {
             const url = getBarcodeUrl(item.barcode);
-            // Perbesar ukuran barcode agar mudah discan: lebar modul 4, tinggi 80, lebar keseluruhan 2x
-            JsBarcode(svg, url, { 
-              format: "CODE128", 
-              width: 4,          // Lebar modul (default 2) diperbesar
-              height: 80,        // Tinggi barcode ditambah
-              displayValue: false, 
-              fontSize: 16,
-              margin: 10
+            JsBarcode(svg, url, {
+              format: "CODE128",
+              width: 4,
+              height: 100,
+              displayValue: false,
+              margin: 10,
+              background: "#ffffff",
+              lineColor: "#000000"
             });
           }
         });
@@ -564,25 +561,15 @@
 
     // Fungsi untuk memicu file upload (dipanggil dari tombol di modal)
     function triggerFileUpload() {
-      // Tutup modal
       if (imageOptionModal) imageOptionModal.hide();
-      
-      // Panggil click pada hidden input (langsung dari event handler tombol, user activation terpenuhi)
       document.getElementById('hiddenFileInput').click();
     }
 
-    // Event listener untuk hidden file input
     const fileInput = document.getElementById('hiddenFileInput');
     fileInput.onchange = async function(e) {
       const file = e.target.files[0];
-      if (!file) {
-        console.log('Tidak ada file dipilih');
-        return;
-      }
+      if (!file) return;
 
-      console.log('File dipilih:', file.name, 'mode:', uploadContext.mode);
-
-      // Tampilkan loading (alert sederhana)
       alert('Mengupload gambar, harap tunggu...');
 
       try {
@@ -607,18 +594,15 @@
         console.error('Error upload:', error);
         alert('Gagal upload gambar. ' + error.message);
         
-        // Jika gagal, simpan tanpa gambar
         if (uploadContext.mode === 'add' && uploadContext.data) {
           const { name, category, quantity, location } = uploadContext.data;
           await saveNewItem(name, category, quantity, location, '');
         }
       } finally {
-        // Reset file input
         fileInput.value = '';
       }
     };
 
-    // Fungsi untuk submit URL dari modal
     function submitImageUrl() {
       const urlInput = document.getElementById('imageUrlInput');
       const url = urlInput.value.trim();
@@ -640,11 +624,9 @@
         }).then(() => alert('Barang berhasil diupdate!'));
       }
       
-      // Reset input
       urlInput.value = '';
     }
 
-    // Fungsi untuk skip gambar
     function skipImage() {
       if (imageOptionModal) imageOptionModal.hide();
       
@@ -653,7 +635,6 @@
         saveNewItem(name, category, quantity, location, '');
       } else if (uploadContext.mode === 'edit' && uploadContext.item) {
         const item = uploadContext.item;
-        // Tidak mengubah gambar
         updateItem(uploadContext.itemId, { 
           name: item.name, 
           category: item.category, 
@@ -741,87 +722,83 @@
       alert('Import selesai');
     }
 
-    // ==================== SCAN ====================
+    // ==================== SCAN (PERBAIKAN TOTAL) ====================
     let scanner = null;
     let scanModalInstance = null;
 
     function showScanModal() {
-      // Pastikan modal scan ditampilkan dengan benar
       const modalEl = document.getElementById('scanModal');
       scanModalInstance = new bootstrap.Modal(modalEl);
-      scanModalInstance.show();
       
-      // Tunggu modal terbuka sempurna, baru inisialisasi scanner
-      modalEl.addEventListener('shown.bs.modal', function onShown() {
-        modalEl.removeEventListener('shown.bs.modal', onShown);
-        initScanner();
-      });
-    }
-
-    function initScanner() {
-      // Hentikan scanner sebelumnya jika ada
+      // Hentikan scanner jika sebelumnya aktif
       if (scanner) {
         scanner.stop();
         scanner = null;
       }
 
+      modalEl.addEventListener('shown.bs.modal', function onShown() {
+        modalEl.removeEventListener('shown.bs.modal', onShown);
+        initScanner();
+      });
+
+      modalEl.addEventListener('hidden.bs.modal', function onHidden() {
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        if (scanner) {
+          scanner.stop();
+          scanner = null;
+        }
+      });
+
+      scanModalInstance.show();
+    }
+
+    function initScanner() {
       const video = document.getElementById('preview');
       if (!video) return;
 
       // Pastikan video visible
       video.style.display = 'block';
-      
-      scanner = new Instascan.Scanner({ 
-        video: video, 
-        scanPeriod: 3,        // Lebih cepat
-        refractoryPeriod: 50,  // Kurangi delay
+
+      scanner = new Instascan.Scanner({
+        video: video,
+        scanPeriod: 3,
+        refractoryPeriod: 50,
         backgroundScan: true
       });
 
       scanner.addListener('scan', function (content) {
-        const cleanContent = content.trim();
-        console.log('Barcode terdeteksi:', cleanContent);
-        
-        // Tampilkan pesan
-        document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${cleanContent}</span>`;
-        
-        // Hentikan scanner
+        console.log('Scan result:', content);
+        document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
+
+        // Hentikan scanner setelah scan berhasil
         scanner.stop();
-        
-        // Parse URL untuk mendapatkan kode barcode asli
-        let barcodeCode = null;
+
+        // Ekstrak kode barcode dari content (bisa URL atau teks biasa)
+        let barcodeCode = content;
         try {
           // Jika content adalah URL, ambil parameter barcode
-          const url = new URL(cleanContent);
+          const url = new URL(content);
           const params = new URLSearchParams(url.search);
-          barcodeCode = params.get('barcode');
+          if (params.has('barcode')) {
+            barcodeCode = params.get('barcode');
+          }
         } catch (e) {
-          // Jika bukan URL, anggap sebagai kode langsung
-          barcodeCode = cleanContent.replace(/\s+/g, '');
+          // Bukan URL, gunakan langsung
+          barcodeCode = content.trim();
         }
 
-        if (!barcodeCode) {
-          alert('Format barcode tidak dikenal');
-          return;
-        }
+        // Cari item berdasarkan kode (case-insensitive, tanpa spasi)
+        const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === barcodeCode.replace(/\s+/g, '').toLowerCase());
 
-        // Cari item di database
-        const item = items.find(i => {
-          const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
-          return itemBarcode.toLowerCase() === barcodeCode.toLowerCase();
-        });
-        
         if (item) {
-          // Tutup modal scan
           if (scanModalInstance) scanModalInstance.hide();
-          // Tampilkan hasil scan
           showScanResultModal(item);
         } else {
-          alert('Barang dengan barcode ' + cleanContent + ' tidak ditemukan.');
+          alert('Barang dengan kode ' + content + ' tidak ditemukan.');
         }
       });
 
-      Instascan.Camera.getCameras().then(function (cameras) {
+      Instascan.Camera.getCameras().then(cameras => {
         if (cameras.length > 0) {
           // Prioritaskan kamera belakang
           const backCamera = cameras.find(c => 
@@ -835,10 +812,10 @@
             alert('Tidak dapat mengakses kamera: ' + err.message);
           });
         } else {
-          alert('Kamera tidak ditemukan. Gunakan input manual.');
+          alert('Tidak ada kamera yang ditemukan. Gunakan input manual.');
         }
-      }).catch(function (err) {
-        console.error('Kamera error:', err);
+      }).catch(err => {
+        console.error('Error accessing cameras:', err);
         alert('Gagal mengakses kamera: ' + err.message);
       });
     }
@@ -846,45 +823,34 @@
     function manualScan() {
       const code = document.getElementById('manualBarcode').value.trim();
       if (!code) return alert('Masukkan kode');
-      
+
       const cleanCode = code.replace(/\s+/g, '');
-      console.log('Manual scan:', cleanCode);
-      
-      const item = items.find(i => {
-        const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
-        return itemBarcode.toLowerCase() === cleanCode.toLowerCase();
-      });
-      
+      const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === cleanCode.toLowerCase());
+
       if (item) {
         if (scanModalInstance) scanModalInstance.hide();
         showScanResultModal(item);
       } else {
-        alert('Barang dengan kode ' + cleanCode + ' tidak ditemukan.');
+        alert('Barang dengan kode ' + code + ' tidak ditemukan.');
       }
     }
 
     // Fungsi untuk menampilkan modal hasil scan dengan link
     function showScanResultModal(item) {
-      console.log('Menampilkan modal hasil scan:', item);
-      
-      // Simpan item yang di-scan
       lastScannedItem = item;
       
-      // Isi modal
       document.getElementById('scanBarcodeValue').innerText = item.barcode;
       document.getElementById('scanItemName').innerText = item.name;
       
       const url = getBarcodeUrl(item.barcode);
       document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
       
-      // Tampilkan modal
       if (!scanResultModal) {
         scanResultModal = new bootstrap.Modal(document.getElementById('scanResultModal'));
       }
       scanResultModal.show();
     }
 
-    // Fungsi untuk pergi ke detail dari modal hasil scan
     function goToDetailFromScan() {
       if (scanResultModal) scanResultModal.hide();
       if (lastScannedItem) {
@@ -920,12 +886,14 @@
       `;
       setTimeout(() => {
         const url = getBarcodeUrl(item.barcode);
-        JsBarcode("#detailBarcode", url, { 
-          format: "CODE128", 
-          width: 4, 
-          height: 80, 
+        JsBarcode("#detailBarcode", url, {
+          format: "CODE128",
+          width: 4,
+          height: 100,
           displayValue: false,
-          margin: 10
+          margin: 10,
+          background: "#ffffff",
+          lineColor: "#000000"
         });
       }, 50);
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
@@ -1048,10 +1016,7 @@
       const barcode = urlParams.get('barcode');
       if (barcode) {
         const cleanBarcode = barcode.trim().replace(/\s+/g, '');
-        const item = items.find(i => {
-          const itemBarcode = i.barcode.trim().replace(/\s+/g, '');
-          return itemBarcode.toLowerCase() === cleanBarcode.toLowerCase();
-        });
+        const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === cleanBarcode.toLowerCase());
         if (item) {
           setTimeout(() => displayItemDetailModal(item), 500);
         } else {
