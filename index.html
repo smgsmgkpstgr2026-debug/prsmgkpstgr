@@ -731,11 +731,13 @@
       
       scanner = new Instascan.Scanner({ video, scanPeriod: 5, refractoryPeriod: 100 });
       scanner.addListener('scan', function (content) {
-        // Tampilkan alert untuk debugging (agar user tahu bahwa barcode terbaca)
-        alert('Barcode terdeteksi: ' + content);
+        // Tampilkan alert untuk debugging (opsional, bisa dihapus jika sudah stabil)
+        // alert('Barcode terdeteksi: ' + content);
         console.log('Barcode terdeteksi:', content);
         document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
         scanner.stop();
+        
+        // Cari item berdasarkan barcode (case insensitive)
         const item = items.find(i => i.barcode.trim().toLowerCase() === content.trim().toLowerCase());
         if (item) {
           console.log('Item ditemukan:', item);
@@ -744,11 +746,14 @@
         } else {
           console.log('Item tidak ditemukan untuk barcode:', content);
           alert('Barang dengan barcode ' + content + ' tidak ditemukan.');
+          // Opsional: restart scanner setelah alert
+          // initScanner();
         }
       });
 
       Instascan.Camera.getCameras().then(function (cameras) {
         if (cameras.length > 0) {
+          // Prioritaskan kamera belakang
           const backCamera = cameras.find(c => c.name.toLowerCase().includes('back')) || cameras[0];
           scanner.start(backCamera);
         } else {
@@ -780,6 +785,7 @@
       console.log('Menampilkan modal hasil scan untuk item:', item);
       lastScannedItem = item;
       document.getElementById('scanItemName').innerText = item.name;
+      // Buat URL lengkap dengan parameter barcode
       const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
       document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
       if (!scanResultModal) {
@@ -942,8 +948,10 @@
       const urlParams = new URLSearchParams(window.location.search);
       const barcode = urlParams.get('barcode');
       if (barcode) {
+        // Cari item berdasarkan barcode
         const item = items.find(i => i.barcode.trim().toLowerCase() === barcode.trim().toLowerCase());
         if (item) {
+          // Tampilkan detail setelah halaman dimuat
           setTimeout(() => displayItemDetailModal(item), 500);
         } else {
           alert('Barang dengan barcode ' + barcode + ' tidak ditemukan.');
