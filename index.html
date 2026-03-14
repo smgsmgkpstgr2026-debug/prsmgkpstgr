@@ -731,15 +731,16 @@
       
       scanner = new Instascan.Scanner({ video, scanPeriod: 5, refractoryPeriod: 100 });
       scanner.addListener('scan', function (content) {
+        console.log('Barcode terdeteksi:', content); // DEBUG
         document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
         scanner.stop();
         const item = items.find(i => i.barcode.trim().toLowerCase() === content.trim().toLowerCase());
         if (item) {
-          // Tutup modal scan
+          console.log('Item ditemukan:', item); // DEBUG
           bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
-          // Tampilkan modal hasil scan dengan link
           showScanResultModal(item);
         } else {
+          console.log('Item tidak ditemukan untuk barcode:', content); // DEBUG
           alert('Barang tidak ditemukan');
         }
       });
@@ -757,17 +758,21 @@
     function manualScan() {
       const code = document.getElementById('manualBarcode').value.trim();
       if (!code) return alert('Masukkan kode');
+      console.log('Manual scan:', code); // DEBUG
       const item = items.find(i => i.barcode.trim().toLowerCase() === code.trim().toLowerCase());
       if (item) {
+        console.log('Item ditemukan:', item); // DEBUG
         bootstrap.Modal.getInstance(document.getElementById('scanModal')).hide();
         showScanResultModal(item);
       } else {
+        console.log('Item tidak ditemukan untuk kode:', code); // DEBUG
         alert('Barang tidak ditemukan');
       }
     }
 
     // Fungsi untuk menampilkan modal hasil scan dengan link
     function showScanResultModal(item) {
+      console.log('Menampilkan modal hasil scan untuk item:', item); // DEBUG
       lastScannedItem = item;
       document.getElementById('scanItemName').innerText = item.name;
       const url = window.location.origin + window.location.pathname + '?barcode=' + encodeURIComponent(item.barcode);
