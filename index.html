@@ -89,7 +89,37 @@
     </div>
   </div>
 
-  <!-- Hidden file input untuk upload -->
+  <!-- Modal untuk pilihan gambar (upload / URL) -->
+  <div class="modal fade" id="imageOptionModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Pilih Gambar</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Upload file dari komputer</label>
+            <button class="btn btn-primary w-100" onclick="triggerFileUpload()">
+              <i class="fas fa-upload"></i> Pilih File
+            </button>
+          </div>
+          <hr>
+          <div class="mb-3">
+            <label for="imageUrlInput" class="form-label">Atau masukkan URL gambar</label>
+            <input type="url" class="form-control" id="imageUrlInput" placeholder="https://...">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-success" onclick="submitImageUrl()">Gunakan URL</button>
+          <button type="button" class="btn btn-info" onclick="skipImage()">Lewati (tanpa gambar)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input -->
   <input type="file" id="hiddenFileInput" accept="image/*">
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -114,7 +144,6 @@
       CURRENT_USER: 'current_user'
     };
 
-    // Inisialisasi data default users
     function initLocalData() {
       if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([
@@ -134,6 +163,18 @@
     let requests = [];
     let itemsListener = null;
     let requestsListener = null;
+    let currentPage = 'login';
+
+    // Variabel untuk menyimpan konteks upload (data barang sementara)
+    let uploadContext = {
+      mode: null,       // 'add' atau 'edit'
+      data: null,       // untuk add: {name, category, quantity, location}
+      itemId: null,     // untuk edit
+      item: null        // untuk edit: objek item
+    };
+
+    // Modal imageOption
+    let imageOptionModal = null;
 
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
@@ -237,8 +278,6 @@
     }
 
     // ==================== ROUTING & UI ====================
-    let currentPage = 'login';
-
     function renderNav() {
       const user = getCurrentUser();
       const navLinks = document.getElementById('navLinks');
@@ -411,43 +450,7 @@
       if (item) displayItemDetailModal(item);
     }
 
-    // ==================== FUNGSI UPLOAD DAN TAMBAH ITEM ====================
-    // Variabel untuk menyimpan data sementara saat upload
-    let pendingItemData = null;
-
-    // Setup hidden file input
-    const fileInput = document.getElementById('hiddenFileInput');
-    fileInput.onchange = async function(e) {
-      const file = e.target.files[0];
-      if (!file) {
-        pendingItemData = null;
-        return;
-      }
-      
-      if (!pendingItemData) {
-        alert('Terjadi kesalahan: data barang tidak ditemukan.');
-        return;
-      }
-      
-      // Tampilkan loading
-      alert('Mengupload gambar, harap tunggu...');
-      
-      try {
-        const imageUrl = await uploadImage(file);
-        const { name, category, quantity, location } = pendingItemData;
-        await saveNewItem(name, category, quantity, location, imageUrl);
-      } catch (error) {
-        console.error('Error upload:', error);
-        alert('Gagal upload gambar. Barang tetap disimpan tanpa gambar.');
-        const { name, category, quantity, location } = pendingItemData;
-        await saveNewItem(name, category, quantity, location, '');
-      } finally {
-        pendingItemData = null;
-        // Reset file input
-        fileInput.value = '';
-      }
-    };
-
+    // ==================== FUNGSI TAMBAH / EDIT DENGAN MODAL GAMBAR ====================
     function showAddItemModal() {
       const name = prompt('Nama Barang:');
       if (!name) return;
@@ -461,40 +464,19 @@
       const location = prompt('Lokasi:');
       if (location === null) return;
       
-      const imageOption = prompt(
-        'PILIHAN GAMBAR:\n' +
-        '- Ketik "upload" untuk memilih file dari komputer\n' +
-        '- Masukkan URL gambar (contoh: https://...)\n' +
-        '- Kosongkan jika tidak ada gambar'
-      );
-      
-      if (imageOption && imageOption.toLowerCase() === 'upload') {
-        // Simpan data sementara
-        pendingItemData = { name, category, quantity, location };
-        // Trigger file input
-        setTimeout(() => fileInput.click(), 100);
-      } else {
-        // Simpan dengan URL atau tanpa gambar
-        saveNewItem(name, category, quantity, location, imageOption || '');
-      }
-    }
-
-    async function saveNewItem(name, category, quantity, location, imageUrl) {
-      const barcode = 'INV-' + Math.floor(Math.random() * 10000);
-      const newItem = {
-        name: name,
-        category: category,
-        quantity: quantity,
-        location: location,
-        barcode: barcode,
-        image: imageUrl,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      // Set konteks untuk tambah
+      uploadContext = {
+        mode: 'add',
+        data: { name, category, quantity, location },
+        itemId: null,
+        item: null
       };
       
-      const success = await addItem(newItem);
-      if (success) {
-        alert('Barang berhasil ditambahkan!');
+      // Tampilkan modal pilihan gambar
+      if (!imageOptionModal) {
+        imageOptionModal = new bootstrap.Modal(document.getElementById('imageOptionModal'));
       }
+      imageOptionModal.show();
     }
 
     async function editItem(id) {
@@ -513,62 +495,138 @@
       const newLoc = prompt('Lokasi:', item.location);
       if (newLoc) item.location = newLoc;
       
-      const newImage = prompt('URL gambar baru (kosongkan jika tidak berubah, ketik "hapus" untuk hapus, "upload" untuk upload baru):', item.image);
+      // Simpan konteks edit
+      uploadContext = {
+        mode: 'edit',
+        data: { name: item.name, category: item.category, quantity: item.quantity, location: item.location },
+        itemId: id,
+        item: item
+      };
       
-      if (newImage === 'hapus') {
-        item.image = '';
-        await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-        alert('Barang berhasil diupdate!');
-      } else if (newImage === 'upload') {
-        // Simpan data untuk edit
-        pendingItemData = { 
+      // Tampilkan modal pilihan gambar
+      if (!imageOptionModal) {
+        imageOptionModal = new bootstrap.Modal(document.getElementById('imageOptionModal'));
+      }
+      imageOptionModal.show();
+    }
+
+    // Fungsi untuk memicu file upload (dipanggil dari tombol di modal)
+    function triggerFileUpload() {
+      // Tutup modal
+      if (imageOptionModal) imageOptionModal.hide();
+      
+      // Panggil click pada hidden input (langsung dari event handler tombol, user activation terpenuhi)
+      document.getElementById('hiddenFileInput').click();
+    }
+
+    // Event listener untuk hidden file input
+    const fileInput = document.getElementById('hiddenFileInput');
+    fileInput.onchange = async function(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        console.log('Tidak ada file dipilih');
+        return;
+      }
+
+      console.log('File dipilih:', file.name, 'mode:', uploadContext.mode);
+
+      // Tampilkan loading (alert sederhana)
+      alert('Mengupload gambar, harap tunggu...');
+
+      try {
+        const imageUrl = await uploadImage(file);
+
+        if (uploadContext.mode === 'add' && uploadContext.data) {
+          const { name, category, quantity, location } = uploadContext.data;
+          await saveNewItem(name, category, quantity, location, imageUrl);
+        } else if (uploadContext.mode === 'edit' && uploadContext.item) {
+          const item = uploadContext.item;
+          item.image = imageUrl;
+          await updateItem(uploadContext.itemId, { 
+            name: item.name, 
+            category: item.category, 
+            quantity: item.quantity, 
+            location: item.location, 
+            image: item.image 
+          });
+          alert('Barang berhasil diupdate!');
+        }
+      } catch (error) {
+        console.error('Error upload:', error);
+        alert('Gagal upload gambar. ' + error.message);
+        
+        // Jika gagal, simpan tanpa gambar
+        if (uploadContext.mode === 'add' && uploadContext.data) {
+          const { name, category, quantity, location } = uploadContext.data;
+          await saveNewItem(name, category, quantity, location, '');
+        }
+      } finally {
+        // Reset file input
+        fileInput.value = '';
+      }
+    };
+
+    // Fungsi untuk submit URL dari modal
+    function submitImageUrl() {
+      const urlInput = document.getElementById('imageUrlInput');
+      const url = urlInput.value.trim();
+      
+      if (imageOptionModal) imageOptionModal.hide();
+      
+      if (uploadContext.mode === 'add' && uploadContext.data) {
+        const { name, category, quantity, location } = uploadContext.data;
+        saveNewItem(name, category, quantity, location, url);
+      } else if (uploadContext.mode === 'edit' && uploadContext.item) {
+        const item = uploadContext.item;
+        item.image = url;
+        updateItem(uploadContext.itemId, { 
           name: item.name, 
           category: item.category, 
           quantity: item.quantity, 
-          location: item.location 
-        };
-        
-        // Override save function untuk update
-        const originalSave = saveNewItem;
-        window.saveNewItem = async (name, category, quantity, location, imageUrl) => {
-          item.image = imageUrl;
-          await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-          alert('Barang berhasil diupdate!');
-          window.saveNewItem = originalSave;
-        };
-        
-        fileInput.onchange = async function(e) {
-          const file = e.target.files[0];
-          if (!file) {
-            window.saveNewItem = originalSave;
-            return;
-          }
-          
-          alert('Mengupload gambar, harap tunggu...');
-          
-          try {
-            const imageUrl = await uploadImage(file);
-            item.image = imageUrl;
-            await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-            alert('Barang berhasil diupdate!');
-          } catch (error) {
-            console.error('Error upload:', error);
-            alert('Gagal upload gambar.');
-          } finally {
-            window.saveNewItem = originalSave;
-            fileInput.value = '';
-          }
-        };
-        
-        setTimeout(() => fileInput.click(), 100);
-        
-      } else if (newImage) {
-        item.image = newImage;
-        await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-        alert('Barang berhasil diupdate!');
-      } else {
-        await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-        alert('Barang berhasil diupdate!');
+          location: item.location, 
+          image: item.image 
+        }).then(() => alert('Barang berhasil diupdate!'));
+      }
+      
+      // Reset input
+      urlInput.value = '';
+    }
+
+    // Fungsi untuk skip gambar
+    function skipImage() {
+      if (imageOptionModal) imageOptionModal.hide();
+      
+      if (uploadContext.mode === 'add' && uploadContext.data) {
+        const { name, category, quantity, location } = uploadContext.data;
+        saveNewItem(name, category, quantity, location, '');
+      } else if (uploadContext.mode === 'edit' && uploadContext.item) {
+        const item = uploadContext.item;
+        // Tidak mengubah gambar
+        updateItem(uploadContext.itemId, { 
+          name: item.name, 
+          category: item.category, 
+          quantity: item.quantity, 
+          location: item.location, 
+          image: item.image 
+        }).then(() => alert('Barang berhasil diupdate!'));
+      }
+    }
+
+    async function saveNewItem(name, category, quantity, location, imageUrl) {
+      const barcode = 'INV-' + Math.floor(Math.random() * 10000);
+      const newItem = {
+        name: name,
+        category: category,
+        quantity: quantity,
+        location: location,
+        barcode: barcode,
+        image: imageUrl,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      
+      const success = await addItem(newItem);
+      if (success) {
+        alert('Barang berhasil ditambahkan!');
       }
     }
 
