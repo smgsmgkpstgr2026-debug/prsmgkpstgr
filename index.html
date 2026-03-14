@@ -21,7 +21,6 @@
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <!-- Firebase Storage TIDAK digunakan lagi -->
   <style>
     body { background-color: #f8f9fa; }
     .navbar { background-color: #0d6efd; }
@@ -31,6 +30,7 @@
     #preview { width: 100%; max-height: 300px; object-fit: cover; }
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
     #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
+    .upload-loading { display: none; }
   </style>
 </head>
 <body>
@@ -104,14 +104,12 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    // Storage tidak digunakan lagi
 
     // ==================== DATA STORAGE (Firestore + Local) ====================
     const STORAGE_KEYS = {
       USERS: 'inventory_users',
       CURRENT_USER: 'current_user'
     };
-    // Users masih di localStorage (bisa dipindah ke Firebase Auth nanti)
 
     // Inisialisasi data default users
     function initLocalData() {
@@ -124,7 +122,6 @@
     }
     initLocalData();
 
-    // Helper get users
     function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)); }
     function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
     function setCurrentUser(user) { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)); }
@@ -135,13 +132,11 @@
     let itemsListener = null;
     let requestsListener = null;
 
-    // Listener untuk items (real-time)
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
       itemsListener = db.collection('items').onSnapshot(snapshot => {
         items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (callback) callback(items);
-        // Render ulang jika halaman terkait sedang aktif
         if (['inventory', 'borrowForm', 'myBorrows', 'borrowRequests', 'history'].includes(currentPage)) {
           renderPage();
         }
@@ -151,7 +146,6 @@
       });
     }
 
-    // Listener untuk requests (real-time)
     function startRequestsListener(callback) {
       if (requestsListener) requestsListener();
       requestsListener = db.collection('borrow_requests').onSnapshot(snapshot => {
@@ -200,13 +194,13 @@
       }
     }
 
-    // ==================== UPLOAD GAMBAR (BASE64 - TANPA STORAGE) ====================
-    async function uploadImage(file) {
+    // ==================== UPLOAD GAMBAR (BASE64) ====================
+    function uploadImage(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           console.log('File berhasil dikonversi ke base64, panjang:', e.target.result.length);
-          resolve(e.target.result); // hasil base64
+          resolve(e.target.result);
         };
         reader.onerror = (e) => {
           console.error('Error membaca file:', e);
@@ -216,7 +210,7 @@
       });
     }
 
-    // ==================== FUNGSI CRUD REQUESTS (FIRESTORE) ====================
+    // ==================== FUNGSI CRUD REQUESTS ====================
     async function addRequest(requestData) {
       try {
         await db.collection('borrow_requests').add(requestData);
@@ -335,7 +329,6 @@
       const user = users.find(u => u.email === email && u.password === pass);
       if (user) {
         setCurrentUser({ id: user.id, name: user.name, email: user.email, role: user.role });
-        // Mulai listener setelah login
         startItemsListener();
         startRequestsListener();
         navigate('inventory');
@@ -415,89 +408,126 @@
       if (item) displayItemDetailModal(item);
     }
 
-    // Admin: tambah item dengan upload gambar (base64)
+    // ==================== FUNGSI UPLOAD DAN TAMBAH ITEM ====================
+    // Fungsi untuk membuat input file secara dinamis
+    function createFileInput(callback) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+      document.body.appendChild(input);
+      
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+          alert('Tidak ada file dipilih.');
+          document.body.removeChild(input);
+          return;
+        }
+        
+        // Tampilkan loading
+        alert('Mengupload gambar, harap tunggu...');
+        
+        try {
+          const imageUrl = await uploadImage(file);
+          document.body.removeChild(input);
+          callback(imageUrl);
+        } catch (error) {
+          console.error('Error upload:', error);
+          alert('Gagal upload gambar: ' + error.message);
+          document.body.removeChild(input);
+          callback(null);
+        }
+      };
+      
+      // Trigger click
+      input.click();
+    }
+
     function showAddItemModal() {
       const name = prompt('Nama Barang:');
       if (!name) return;
+      
       const category = prompt('Kategori:');
+      if (!category) return;
+      
       const quantity = parseInt(prompt('Jumlah:') || '0');
+      if (isNaN(quantity)) return;
+      
       const location = prompt('Lokasi:');
-      const imageOption = prompt('Masukkan URL gambar atau ketik "upload" untuk pilih file dari komputer:');
+      if (!location) return;
+      
+      const imageOption = prompt('Masukkan URL gambar, ketik "upload" untuk pilih file, atau kosongkan jika tidak ada gambar:');
       
       if (imageOption && imageOption.toLowerCase() === 'upload') {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (!file) {
-            alert('Tidak ada file dipilih.');
-            return;
-          }
-          // Tampilkan pesan loading
-          alert('Mengupload gambar, harap tunggu...');
-          const imageUrl = await uploadImage(file);
+        createFileInput(async (imageUrl) => {
           if (imageUrl) {
-            saveNewItem(name, category, quantity, location, imageUrl);
+            await saveNewItem(name, category, quantity, location, imageUrl);
           } else {
-            saveNewItem(name, category, quantity, location, '');
+            await saveNewItem(name, category, quantity, location, '');
           }
-        };
-        input.click();
+        });
       } else {
         saveNewItem(name, category, quantity, location, imageOption || '');
       }
     }
 
     async function saveNewItem(name, category, quantity, location, imageUrl) {
-      const barcode = 'INV-' + Math.floor(Math.random()*10000);
+      const barcode = 'INV-' + Math.floor(Math.random() * 10000);
       const newItem = {
-        name, category, quantity, location, barcode,
+        name: name,
+        category: category,
+        quantity: quantity,
+        location: location,
+        barcode: barcode,
         image: imageUrl,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
-      await addItem(newItem);
-      alert('Barang berhasil ditambahkan!');
+      
+      const success = await addItem(newItem);
+      if (success) {
+        alert('Barang berhasil ditambahkan!');
+      }
     }
 
     async function editItem(id) {
       const item = items.find(i => i.id === id);
       if (!item) return;
+      
       const newName = prompt('Nama Barang:', item.name);
       if (newName) item.name = newName;
+      
       const newCat = prompt('Kategori:', item.category);
       if (newCat) item.category = newCat;
+      
       const newQty = parseInt(prompt('Jumlah:', item.quantity));
       if (!isNaN(newQty)) item.quantity = newQty;
+      
       const newLoc = prompt('Lokasi:', item.location);
       if (newLoc) item.location = newLoc;
       
       const newImage = prompt('URL gambar baru (kosongkan jika tidak berubah, ketik "hapus" untuk hapus, "upload" untuk upload baru):', item.image);
+      
       if (newImage === 'hapus') {
         item.image = '';
+        await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
+        alert('Barang berhasil diupdate!');
       } else if (newImage === 'upload') {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = async (e) => {
-          const file = e.target.files[0];
-          if (file) {
-            const url = await uploadImage(file);
-            if (url) {
-              item.image = url;
-              await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-              alert('Barang berhasil diupdate!');
-            }
+        createFileInput(async (imageUrl) => {
+          if (imageUrl) {
+            item.image = imageUrl;
+            await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
+            alert('Barang berhasil diupdate!');
           }
-        };
-        input.click();
-        return;
+        });
       } else if (newImage) {
         item.image = newImage;
+        await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
+        alert('Barang berhasil diupdate!');
+      } else {
+        await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
+        alert('Barang berhasil diupdate!');
       }
-      
-      await updateItem(id, { name: item.name, category: item.category, quantity: item.quantity, location: item.location, image: item.image });
-      alert('Barang berhasil diupdate!');
     }
 
     async function deleteItem(id) {
@@ -637,7 +667,7 @@
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
     }
 
-    // ==================== PEMINJAMAN DENGAN FIRESTORE ====================
+    // ==================== PEMINJAMAN ====================
     function renderBorrowForm() {
       const user = getCurrentUser();
       if (!user) return '<div class="alert alert-warning">Anda harus login. <a href="#" onclick="navigate(\'login\')">Login</a></div>';
@@ -727,10 +757,8 @@
         alert('Stok tidak cukup!');
         return;
       }
-      // Kurangi stok item
       item.quantity -= req.quantity;
       await updateItem(item.id, { quantity: item.quantity });
-      // Update status request
       await updateRequest(requestId, { status: 'approved' });
       alert('Permintaan disetujui. Stok telah diperbarui.');
     }
