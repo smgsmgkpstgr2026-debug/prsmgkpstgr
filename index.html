@@ -8,16 +8,12 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- JsBarcode -->
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- SheetJS (XLSX) -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <!-- PapaParse (CSV) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <!-- instascan (kamera) - dengan fallback CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/instascan@1.0.0-beta.4/instascan.min.js" onerror="loadInstascanFallback()"></script>
-  <!-- QRCode.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -26,15 +22,9 @@
     .navbar { background-color: #0d6efd; }
     .navbar-brand, .nav-link { color: white !important; }
     .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .barcode-img { max-width: 100%; height: auto; cursor: pointer; display: block; margin: 0 auto; background: #fff; padding: 5px; border-radius: 4px; }
-    #preview { width: 100%; max-height: 300px; object-fit: cover; background: #000; }
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
-    #qrContainer { margin-top: 10px; display: flex; justify-content: center; }
     #hiddenFileInput { display: none; }
-    .scan-link { word-break: break-all; }
-    .scan-result-card { cursor: pointer; transition: all 0.2s; }
-    .barcode-wrapper { text-align: center; padding: 5px; background: #fff; border-radius: 4px; display: inline-block; max-width: 100%; overflow-x: auto; }
-    .camera-error { color: #dc3545; font-weight: bold; }
+    .qr-code { width: 80px; height: 80px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -57,54 +47,6 @@
 
   <div class="container mt-4" id="app">
     <div id="pageContent"></div>
-  </div>
-
-  <!-- Modal scan -->
-  <div class="modal fade" id="scanModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Scan Barcode</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div id="cameraStatus" class="alert alert-info">Mengakses kamera...</div>
-          <video id="preview" style="width:100%;" playsinline autoplay></video>
-          <div class="mt-2 text-center" id="scanResult"></div>
-          <div class="mt-3">
-            <label>Atau masukkan kode manual:</label>
-            <input type="text" id="manualBarcode" class="form-control" placeholder="Ketik kode barcode">
-            <button class="btn btn-secondary mt-2" onclick="manualScan()">Cari</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal hasil scan (tampilan lebih sederhana) -->
-  <div class="modal fade" id="scanResultModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Hasil Scan</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="text-center mb-3">
-            <i class="fas fa-check-circle text-success" style="font-size: 48px;"></i>
-          </div>
-          <p><strong>Barcode:</strong> <span id="scanBarcodeValue"></span></p>
-          <p><strong>Barang:</strong> <span id="scanItemName"></span></p>
-          <p><strong>Link:</strong></p>
-          <div class="alert alert-info scan-link" id="scanItemLink"></div>
-          <p class="text-muted">Klik link di atas untuk membuka detail, atau klik tombol Lihat Detail.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-          <button type="button" class="btn btn-primary" onclick="goToDetailFromScan()">Lihat Detail</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Modal detail -->
@@ -204,42 +146,8 @@
       item: null        // untuk edit: objek item
     };
 
-    // Variabel untuk menyimpan hasil scan terakhir
-    let lastScannedItem = null;
-
     // Modal
     let imageOptionModal = null;
-    let scanResultModal = null;
-
-    // Fungsi untuk membuat URL pendek dari kode barcode
-    function getBarcodeUrl(barcodeCode) {
-      return window.location.origin + window.location.pathname + '?b=' + encodeURIComponent(barcodeCode);
-    }
-
-    // Fallback jika instascan dari jsdelivr gagal
-    function loadInstascanFallback() {
-      console.warn('Gagal memuat instascan dari jsdelivr, mencoba dari unpkg...');
-      var script = document.createElement('script');
-      script.src = 'https://unpkg.com/instascan@1.0.0-beta.4/dist/instascan.min.js';
-      script.onload = function() {
-        console.log('instascan berhasil dimuat dari unpkg');
-        document.getElementById('cameraStatus').innerHTML = 'Library scanner tersedia. Silakan buka modal scan lagi.';
-      };
-      script.onerror = function() {
-        console.error('Gagal memuat instascan dari kedua CDN');
-        handleInstascanError();
-      };
-      document.head.appendChild(script);
-    }
-
-    function handleInstascanError() {
-      console.error('Instascan tidak dapat dimuat.');
-      const statusDiv = document.getElementById('cameraStatus');
-      if (statusDiv) {
-        statusDiv.className = 'alert alert-warning';
-        statusDiv.innerHTML = 'Gagal memuat library scanner. Periksa koneksi internet Anda atau gunakan input manual di bawah.';
-      }
-    }
 
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
@@ -451,7 +359,7 @@
       navigate('login');
     }
 
-    // ==================== INVENTORY ====================
+    // ==================== INVENTORY (dengan QR Code) ====================
     function renderInventory() {
       const user = getCurrentUser();
       if (!items.length && user) {
@@ -461,7 +369,6 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h3>Daftar Inventory</h3>
           <div>
-            <button class="btn btn-outline-primary me-2" onclick="showScanModal()"><i class="fas fa-camera"></i> Scan</button>
       `;
       if (user && user.role === 'admin') {
         html += `
@@ -476,23 +383,25 @@
           <table class="table table-bordered table-hover">
             <thead class="table-light">
               <tr>
-                <th>Nama</th><th>Kategori</th><th>Stok</th><th>Lokasi</th><th>Barcode</th>
+                <th>Nama</th><th>Kategori</th><th>Stok</th><th>Lokasi</th><th>Gambar</th><th>QR Code</th>
                 ${user && user.role === 'admin' ? '<th>Aksi</th>' : ''}
               </tr>
             </thead>
             <tbody>
       `;
       items.forEach(item => {
+        // Buat URL untuk QR code
+        const url = window.location.origin + window.location.pathname + '?item=' + item.id;
         html += `<tr>
           <td>${item.name}</td>
           <td>${item.category}</td>
           <td>${item.quantity}</td>
           <td>${item.location}</td>
           <td>
-            <div class="barcode-wrapper">
-              <svg class="barcode-img" id="barcode-${item.id}" data-id="${item.id}" onclick="showItemDetail('${item.id}')"></svg>
-            </div>
-            <small>${item.barcode}</small>
+            ${item.image ? `<img src="${item.image}" class="item-image" style="max-height:50px;" alt="gambar" onclick="showItemDetail('${item.id}')">` : '-'}
+          </td>
+          <td>
+            <div class="qr-code" id="qr-${item.id}" data-url="${url}" onclick="showItemDetail('${item.id}')"></div>
           </td>
           ${user && user.role === 'admin' ? `<td>
             <button class="btn btn-sm btn-warning" onclick="editItem('${item.id}')"><i class="fas fa-edit"></i></button>
@@ -501,19 +410,19 @@
         </tr>`;
       });
       html += '</tbody></table></div>';
+      // Setelah tabel dirender, generate QR code untuk setiap item
       setTimeout(() => {
         items.forEach(item => {
-          const svg = document.getElementById(`barcode-${item.id}`);
-          if (svg) {
-            const url = getBarcodeUrl(item.barcode);
-            JsBarcode(svg, url, {
-              format: "CODE128",
-              width: 2,
+          const container = document.getElementById(`qr-${item.id}`);
+          if (container) {
+            const url = window.location.origin + window.location.pathname + '?item=' + item.id;
+            new QRCode(container, {
+              text: url,
+              width: 80,
               height: 80,
-              displayValue: false,
-              margin: 10,
-              background: "#ffffff",
-              lineColor: "#000000"
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.H
             });
           }
         });
@@ -522,8 +431,32 @@
     }
 
     function showItemDetail(itemId) {
+      // Jika user login, ambil dari items global
       const item = items.find(i => i.id === itemId);
-      if (item) displayItemDetailModal(item);
+      if (item) {
+        displayItemDetailModal(item);
+      } else {
+        // Jika tidak ada (misal dari link public), ambil dari Firestore langsung
+        getItemById(itemId).then(item => {
+          if (item) displayItemDetailModal(item);
+          else alert('Barang tidak ditemukan');
+        });
+      }
+    }
+
+    // Fungsi untuk mengambil item dari Firestore berdasarkan ID (tanpa login)
+    async function getItemById(itemId) {
+      try {
+        const doc = await db.collection('items').doc(itemId).get();
+        if (doc.exists) {
+          return { id: doc.id, ...doc.data() };
+        } else {
+          return null;
+        }
+      } catch (error) {
+        console.error('Error getting item:', error);
+        return null;
+      }
     }
 
     // ==================== FUNGSI TAMBAH / EDIT DENGAN MODAL GAMBAR ====================
@@ -673,13 +606,11 @@
     }
 
     async function saveNewItem(name, category, quantity, location, imageUrl) {
-      const barcode = 'INV-' + Math.floor(Math.random() * 10000);
       const newItem = {
         name: name,
         category: category,
         quantity: quantity,
         location: location,
-        barcode: barcode,
         image: imageUrl,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -740,7 +671,6 @@
           category: row.category || 'Umum',
           quantity: parseInt(row.quantity) || 0,
           location: row.location || 'Gudang',
-          barcode: 'INV-' + Math.floor(Math.random()*10000) + i,
           image: row.image || '',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -749,190 +679,7 @@
       alert('Import selesai');
     }
 
-    // ==================== SCAN (PERBAIKAN TOTAL) ====================
-    let scanner = null;
-    let scanModalInstance = null;
-
-    function showScanModal() {
-      const modalEl = document.getElementById('scanModal');
-      
-      // Reset status kamera
-      const statusDiv = document.getElementById('cameraStatus');
-      if (statusDiv) {
-        statusDiv.className = 'alert alert-info';
-        statusDiv.innerHTML = 'Mengakses kamera...';
-      }
-
-      // Hentikan scanner jika sebelumnya aktif
-      if (scanner) {
-        scanner.stop();
-        scanner = null;
-      }
-
-      scanModalInstance = new bootstrap.Modal(modalEl);
-      
-      modalEl.addEventListener('shown.bs.modal', function onShown() {
-        modalEl.removeEventListener('shown.bs.modal', onShown);
-        setTimeout(initScanner, 500);
-      });
-
-      modalEl.addEventListener('hidden.bs.modal', function onHidden() {
-        modalEl.removeEventListener('hidden.bs.modal', onHidden);
-        if (scanner) {
-          scanner.stop();
-          scanner = null;
-        }
-        const video = document.getElementById('preview');
-        if (video && video.srcObject) {
-          video.srcObject.getTracks().forEach(track => track.stop());
-          video.srcObject = null;
-        }
-      });
-
-      scanModalInstance.show();
-    }
-
-    function initScanner() {
-      const video = document.getElementById('preview');
-      if (!video) return;
-
-      // Cek apakah instascan tersedia
-      if (typeof Instascan === 'undefined') {
-        document.getElementById('cameraStatus').innerHTML = 'Library scanner tidak tersedia. Gunakan input manual.';
-        return;
-      }
-
-      // Pastikan video visible
-      video.style.display = 'block';
-
-      // Cek dukungan kamera
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        document.getElementById('cameraStatus').innerHTML = 'Browser Anda tidak mendukung akses kamera. Gunakan input manual.';
-        return;
-      }
-
-      scanner = new Instascan.Scanner({
-        video: video,
-        scanPeriod: 3,
-        refractoryPeriod: 50,
-        backgroundScan: true
-      });
-
-      scanner.addListener('scan', function (content) {
-        console.log('Scan result:', content);
-        document.getElementById('scanResult').innerHTML = `<span class="badge bg-success">Barcode: ${content}</span>`;
-
-        // Hentikan scanner setelah scan berhasil
-        scanner.stop();
-
-        // Ekstrak kode barcode dari content (bisa URL atau teks biasa)
-        let barcodeCode = content;
-        try {
-          // Jika content adalah URL, ambil parameter 'b' atau 'barcode'
-          const url = new URL(content);
-          const params = new URLSearchParams(url.search);
-          if (params.has('b')) {
-            barcodeCode = params.get('b');
-          } else if (params.has('barcode')) {
-            barcodeCode = params.get('barcode');
-          }
-        } catch (e) {
-          // Bukan URL, gunakan langsung
-          barcodeCode = content.trim();
-        }
-
-        // Cari item berdasarkan kode (case-insensitive, tanpa spasi)
-        const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === barcodeCode.replace(/\s+/g, '').toLowerCase());
-
-        if (item) {
-          if (scanModalInstance) scanModalInstance.hide();
-          showScanResultModal(item);
-        } else {
-          alert('Barang dengan kode ' + content + ' tidak ditemukan.');
-        }
-      });
-
-      // Minta izin kamera dan mulai scanner
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          // Hentikan stream sementara, nanti instascan yang akan mengelola
-          stream.getTracks().forEach(track => track.stop());
-          
-          // Lanjutkan dengan instascan
-          Instascan.Camera.getCameras().then(cameras => {
-            if (cameras.length > 0) {
-              // Prioritaskan kamera belakang
-              const backCamera = cameras.find(c => 
-                c.name.toLowerCase().includes('back') || 
-                c.name.toLowerCase().includes('rear') ||
-                c.name.toLowerCase().includes('belakang')
-              ) || cameras[0];
-              
-              scanner.start(backCamera).then(() => {
-                document.getElementById('cameraStatus').innerHTML = 'Kamera aktif. Arahkan ke barcode.';
-              }).catch(err => {
-                console.error('Gagal memulai kamera:', err);
-                document.getElementById('cameraStatus').innerHTML = 'Gagal memulai kamera: ' + err.message;
-              });
-            } else {
-              document.getElementById('cameraStatus').innerHTML = 'Tidak ada kamera yang ditemukan. Gunakan input manual.';
-            }
-          }).catch(err => {
-            console.error('Error accessing cameras:', err);
-            document.getElementById('cameraStatus').innerHTML = 'Gagal mengakses kamera: ' + err.message;
-          });
-        })
-        .catch(err => {
-          console.error('Izin kamera ditolak:', err);
-          document.getElementById('cameraStatus').innerHTML = 'Izin kamera ditolak. Gunakan input manual.';
-        });
-    }
-
-    function manualScan() {
-      const code = document.getElementById('manualBarcode').value.trim();
-      if (!code) return alert('Masukkan kode');
-
-      const cleanCode = code.replace(/\s+/g, '');
-      const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === cleanCode.toLowerCase());
-
-      if (item) {
-        if (scanModalInstance) scanModalInstance.hide();
-        showScanResultModal(item);
-      } else {
-        alert('Barang dengan kode ' + code + ' tidak ditemukan.');
-      }
-    }
-
-    // Fungsi untuk menampilkan modal hasil scan dengan link
-    function showScanResultModal(item) {
-      lastScannedItem = item;
-      
-      document.getElementById('scanBarcodeValue').innerText = item.barcode;
-      document.getElementById('scanItemName').innerText = item.name;
-      
-      const url = getBarcodeUrl(item.barcode);
-      document.getElementById('scanItemLink').innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
-      
-      if (!scanResultModal) {
-        scanResultModal = new bootstrap.Modal(document.getElementById('scanResultModal'));
-      }
-      scanResultModal.show();
-    }
-
-    function goToDetailFromScan() {
-      if (scanResultModal) scanResultModal.hide();
-      if (lastScannedItem) {
-        displayItemDetailModal(lastScannedItem);
-      }
-    }
-
-    function generateQRCode(barcode) {
-      const container = document.getElementById('qrContainer');
-      container.innerHTML = '';
-      const url = getBarcodeUrl(barcode);
-      new QRCode(container, { text: url, width: 200, height: 200 });
-    }
-
+    // ==================== MODAL DETAIL (tanpa barcode/qrcode) ====================
     function displayItemDetailModal(item) {
       const modalBody = document.getElementById('itemDetailBody');
       modalBody.innerHTML = `
@@ -943,27 +690,7 @@
         <p><strong>Kategori:</strong> ${item.category}</p>
         <p><strong>Stok:</strong> ${item.quantity}</p>
         <p><strong>Lokasi:</strong> ${item.location}</p>
-        <p><strong>Barcode:</strong> ${item.barcode}</p>
-        <div class="barcode-wrapper">
-          <svg id="detailBarcode" style="width:100%; max-width:400px;"></svg>
-        </div>
-        <div class="text-center mt-3">
-          <button class="btn btn-sm btn-info" onclick="generateQRCode('${item.barcode}')">Tampilkan QR Code</button>
-          <div id="qrContainer" style="margin-top:10px;"></div>
-        </div>
       `;
-      setTimeout(() => {
-        const url = getBarcodeUrl(item.barcode);
-        JsBarcode("#detailBarcode", url, {
-          format: "CODE128",
-          width: 2,
-          height: 80,
-          displayValue: false,
-          margin: 10,
-          background: "#ffffff",
-          lineColor: "#000000"
-        });
-      }, 50);
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
     }
 
@@ -1078,31 +805,44 @@
       return html;
     }
 
-    // ==================== DEEP LINKING ====================
-    function checkUrlForBarcode() {
+    // ==================== HANDLE PUBLIC LINK (VIEW ONLY) ====================
+    async function handlePublicLink() {
       const urlParams = new URLSearchParams(window.location.search);
-      // Cek parameter 'b' atau 'barcode'
-      let barcode = urlParams.get('b') || urlParams.get('barcode');
-      if (barcode) {
-        const cleanBarcode = barcode.trim().replace(/\s+/g, '');
-        const item = items.find(i => i.barcode.replace(/\s+/g, '').toLowerCase() === cleanBarcode.toLowerCase());
+      const itemId = urlParams.get('item');
+      if (itemId) {
+        // Jika user tidak login, kita tetap tampilkan detail
+        const item = await getItemById(itemId);
         if (item) {
+          // Sembunyikan navbar agar tidak mengganggu? Atau biarkan saja.
+          // Tampilkan modal segera setelah halaman siap
           setTimeout(() => displayItemDetailModal(item), 500);
         } else {
-          alert('Barang dengan barcode ' + barcode + ' tidak ditemukan.');
+          alert('Barang tidak ditemukan');
         }
       }
     }
 
     // ==================== INIT ====================
-    window.onload = () => {
-      if (getCurrentUser()) {
-        startItemsListener();
-        startRequestsListener();
-        navigate('inventory');
-        checkUrlForBarcode();
+    window.onload = async () => {
+      // Cek apakah ada parameter item (public link)
+      const urlParams = new URLSearchParams(window.location.search);
+      const itemId = urlParams.get('item');
+      
+      if (itemId) {
+        // Public link: tampilkan detail tanpa login
+        await handlePublicLink();
+        // Jangan arahkan ke login, biarkan halaman kosong dengan modal
+        // Tapi kita perlu menyembunyikan konten utama? Biarkan saja pageContent kosong.
+        document.getElementById('pageContent').innerHTML = ''; // kosong
       } else {
-        navigate('login');
+        // Tidak ada parameter item, jalankan normal
+        if (getCurrentUser()) {
+          startItemsListener();
+          startRequestsListener();
+          navigate('inventory');
+        } else {
+          navigate('login');
+        }
       }
     };
   </script>
