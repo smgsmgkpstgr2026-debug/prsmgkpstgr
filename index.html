@@ -416,6 +416,8 @@
           const container = document.getElementById(`qr-${item.id}`);
           if (container) {
             const url = window.location.origin + window.location.pathname + '?item=' + item.id;
+            // Hapus konten sebelumnya jika ada
+            container.innerHTML = '';
             new QRCode(container, {
               text: url,
               width: 80,
@@ -679,7 +681,7 @@
       alert('Import selesai');
     }
 
-    // ==================== MODAL DETAIL (tanpa barcode/qrcode) ====================
+    // ==================== MODAL DETAIL ====================
     function displayItemDetailModal(item) {
       const modalBody = document.getElementById('itemDetailBody');
       modalBody.innerHTML = `
@@ -691,7 +693,8 @@
         <p><strong>Stok:</strong> ${item.quantity}</p>
         <p><strong>Lokasi:</strong> ${item.location}</p>
       `;
-      new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
+      const modal = new bootstrap.Modal(document.getElementById('itemDetailModal'));
+      modal.show();
     }
 
     // ==================== PEMINJAMAN ====================
@@ -810,14 +813,18 @@
       const urlParams = new URLSearchParams(window.location.search);
       const itemId = urlParams.get('item');
       if (itemId) {
-        // Jika user tidak login, kita tetap tampilkan detail
+        // Tampilkan loading sederhana
+        document.getElementById('pageContent').innerHTML = '<div class="text-center"><div class="spinner-border"></div> Memuat data...</div>';
+        
+        // Ambil data item dari Firestore
         const item = await getItemById(itemId);
         if (item) {
-          // Sembunyikan navbar agar tidak mengganggu? Atau biarkan saja.
-          // Tampilkan modal segera setelah halaman siap
-          setTimeout(() => displayItemDetailModal(item), 500);
+          // Sembunyikan konten utama, tapi modal akan muncul
+          document.getElementById('pageContent').innerHTML = ''; // kosongkan
+          // Tampilkan modal setelah sedikit delay
+          setTimeout(() => displayItemDetailModal(item), 300);
         } else {
-          alert('Barang tidak ditemukan');
+          document.getElementById('pageContent').innerHTML = '<div class="alert alert-danger">Barang tidak ditemukan.</div>';
         }
       }
     }
@@ -831,9 +838,7 @@
       if (itemId) {
         // Public link: tampilkan detail tanpa login
         await handlePublicLink();
-        // Jangan arahkan ke login, biarkan halaman kosong dengan modal
-        // Tapi kita perlu menyembunyikan konten utama? Biarkan saja pageContent kosong.
-        document.getElementById('pageContent').innerHTML = ''; // kosong
+        // Jangan tampilkan navbar? Biarkan saja, user bisa login jika mau
       } else {
         // Tidak ada parameter item, jalankan normal
         if (getCurrentUser()) {
