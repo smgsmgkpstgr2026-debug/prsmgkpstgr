@@ -28,42 +28,13 @@
     .user-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #0d6efd; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
     .forgot-password-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
     .forgot-password-link:hover { color: #0a58ca; }
-    .password-wrapper {
-      position: relative;
-    }
-    .password-wrapper input {
-      padding-right: 40px;
-    }
-    .toggle-password {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      color: #6c757d;
-      z-index: 10;
-    }
-    .toggle-password:hover {
-      color: #0d6efd;
-    }
-    .new-password-display {
-      font-family: monospace;
-      font-size: 1.2rem;
-      font-weight: bold;
-      background-color: #f0f0f0;
-      padding: 10px;
-      border-radius: 5px;
-      text-align: center;
-      letter-spacing: 1px;
-      word-break: break-all;
-    }
-    .copy-btn {
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .copy-btn:hover {
-      transform: scale(1.05);
-    }
+    .password-wrapper { position: relative; }
+    .password-wrapper input { padding-right: 40px; }
+    .toggle-password { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6c757d; z-index: 10; }
+    .toggle-password:hover { color: #0d6efd; }
+    .new-password-display { font-family: monospace; font-size: 1.2rem; font-weight: bold; background-color: #f0f0f0; padding: 10px; border-radius: 5px; text-align: center; letter-spacing: 1px; word-break: break-all; }
+    .copy-btn { cursor: pointer; transition: all 0.2s; }
+    .copy-btn:hover { transform: scale(1.05); }
   </style>
 </head>
 <body>
@@ -75,9 +46,7 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto" id="navLinks">
-          <!-- akan diisi javascript -->
-        </ul>
+        <ul class="navbar-nav ms-auto" id="navLinks"></ul>
         <span class="navbar-text text-white me-3" id="userDisplay"></span>
         <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
       </div>
@@ -101,7 +70,7 @@
     </div>
   </div>
 
-  <!-- Modal untuk pilihan gambar (upload / URL) -->
+  <!-- Modal untuk pilihan gambar -->
   <div class="modal fade" id="imageOptionModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -112,9 +81,7 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Upload file dari komputer</label>
-            <button class="btn btn-primary w-100" onclick="triggerFileUpload()">
-              <i class="fas fa-upload"></i> Pilih File
-            </button>
+            <button class="btn btn-primary w-100" onclick="triggerFileUpload()"><i class="fas fa-upload"></i> Pilih File</button>
           </div>
           <hr>
           <div class="mb-3">
@@ -125,7 +92,7 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
           <button type="button" class="btn btn-success" onclick="submitImageUrl()">Gunakan URL</button>
-          <button type="button" class="btn btn-info" onclick="skipImage()">Lewati (tanpa gambar)</button>
+          <button type="button" class="btn btn-info" onclick="skipImage()">Lewati</button>
         </div>
       </div>
     </div>
@@ -141,25 +108,19 @@
         </div>
         <div class="modal-body">
           <input type="hidden" id="editUserId">
+          <div class="mb-3"><label>Nama Lengkap</label><input type="text" class="form-control" id="userName" required></div>
+          <div class="mb-3"><label>Email</label><input type="email" class="form-control" id="userEmail" required></div>
           <div class="mb-3">
-            <label class="form-label">Nama Lengkap</label>
-            <input type="text" class="form-control" id="userName" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-control" id="userEmail" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Password</label>
+            <label>Password</label>
             <div class="password-wrapper">
               <input type="password" class="form-control" id="userPassword" placeholder="Minimal 4 karakter">
               <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('userPassword')"></i>
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">Role</label>
+            <label>Role</label>
             <select class="form-select" id="userRole">
-              <option value="borrower">Peminjam (Borrower)</option>
+              <option value="borrower">Peminjam</option>
               <option value="admin">Admin</option>
             </select>
           </div>
@@ -182,21 +143,21 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">Password Lama</label>
+            <label>Password Lama</label>
             <div class="password-wrapper">
               <input type="password" class="form-control" id="oldPassword" placeholder="Masukkan password lama">
               <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('oldPassword')"></i>
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">Password Baru</label>
+            <label>Password Baru</label>
             <div class="password-wrapper">
               <input type="password" class="form-control" id="newPassword" placeholder="Minimal 4 karakter">
               <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('newPassword')"></i>
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">Konfirmasi Password Baru</label>
+            <label>Konfirmasi Password Baru</label>
             <div class="password-wrapper">
               <input type="password" class="form-control" id="confirmNewPassword" placeholder="Konfirmasi password baru">
               <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('confirmNewPassword')"></i>
@@ -206,15 +167,13 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" onclick="processChangePassword()">
-            <i class="fas fa-save"></i> Ganti Password
-          </button>
+          <button type="button" class="btn btn-primary" onclick="processChangePassword()">Ganti Password</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal Lupa Password (dengan tampilan password baru) -->
+  <!-- Modal Lupa Password -->
   <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -224,19 +183,17 @@
         </div>
         <div class="modal-body">
           <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> Masukkan email Anda untuk mereset password.
+            <i class="fas fa-info-circle"></i> Masukkan email yang terdaftar untuk mereset password.
           </div>
           <div class="mb-3">
-            <label class="form-label">Email</label>
+            <label>Email</label>
             <input type="email" class="form-control" id="forgotEmail" placeholder="contoh@email.com">
           </div>
           <div id="forgotPasswordMessage" class="alert d-none"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" id="sendResetBtn" onclick="processForgotPassword()">
-            <i class="fas fa-paper-plane"></i> Reset Password
-          </button>
+          <button type="button" class="btn btn-primary" id="sendResetBtn" onclick="processForgotPassword()">Reset Password</button>
         </div>
       </div>
     </div>
@@ -252,7 +209,7 @@
         </div>
         <div class="modal-body">
           <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> <strong>Penting!</strong> Salin password baru Anda di bawah ini. Password ini hanya ditampilkan sekali.
+            <i class="fas fa-exclamation-triangle"></i> <strong>Penting!</strong> Salin password baru Anda di bawah ini.
           </div>
           <div class="text-center mb-3">
             <label class="form-label fw-bold">Password Baru Anda:</label>
@@ -261,20 +218,17 @@
               <i class="fas fa-copy"></i> Salin Password
             </button>
           </div>
-          <div class="alert alert-info mt-3">
-            <i class="fas fa-info-circle"></i> Setelah login dengan password baru ini, segera ganti password Anda melalui menu <strong>Ganti Password</strong> untuk keamanan.
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Setelah login, segera ganti password Anda melalui menu <strong>Ganti Password</strong>.
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-success" data-bs-dismiss="modal" onclick="closePasswordModalAndNavigate()">
-            <i class="fas fa-check"></i> Saya sudah menyalin password
-          </button>
+          <button type="button" class="btn btn-success" data-bs-dismiss="modal" onclick="closePasswordModalAndNavigate()">Saya sudah menyalin</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Hidden file input -->
   <input type="file" id="hiddenFileInput" accept="image/*">
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
@@ -293,63 +247,60 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ==================== DATA STORAGE (Firestore + Local) ====================
-    const STORAGE_KEYS = {
-      USERS: 'inventory_users',
-      CURRENT_USER: 'current_user'
-    };
+    // ==================== DATA STORAGE ====================
+    const STORAGE_KEYS = { USERS: 'inventory_users', CURRENT_USER: 'current_user' };
 
+    // Inisialisasi data user default
     function initLocalData() {
-      if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([
+      let users = localStorage.getItem(STORAGE_KEYS.USERS);
+      if (!users) {
+        const defaultUsers = [
           { id: 'u1', name: 'Admin', email: 'admin@inv.com', password: 'admin', role: 'admin' },
           { id: 'u2', name: 'Borrower', email: 'user@inv.com', password: 'user', role: 'borrower' }
-        ]));
+        ];
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
+        console.log('Data user default telah diinisialisasi:', defaultUsers);
+      } else {
+        console.log('Data user yang ada:', JSON.parse(users));
       }
     }
     initLocalData();
 
-    function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)); }
-    function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
-    function setCurrentUser(user) { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)); }
+    function getUsers() { 
+      const users = localStorage.getItem(STORAGE_KEYS.USERS);
+      return users ? JSON.parse(users) : [];
+    }
+    
+    function getCurrentUser() { 
+      const user = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      return user ? JSON.parse(user) : null;
+    }
+    
+    function setCurrentUser(user) { 
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    }
     
     function saveUsers(users) {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+      console.log('User tersimpan:', users);
     }
 
-    // ==================== GLOBAL VARIABLES & LISTENERS ====================
+    // ==================== GLOBAL VARIABLES ====================
     let items = [];
     let requests = [];
     let itemsListener = null;
     let requestsListener = null;
     let currentPage = 'login';
-    let lastResetPassword = ''; // Menyimpan password terakhir yang direset untuk disalin
-
-    let uploadContext = {
-      mode: null,
-      data: null,
-      itemId: null,
-      item: null
-    };
-
-    let imageOptionModal = null;
-    let userModal = null;
-    let forgotPasswordModal = null;
-    let changePasswordModal = null;
-    let showPasswordModal = null;
+    let uploadContext = { mode: null, data: null, itemId: null, item: null };
+    let imageOptionModal = null, userModal = null, forgotPasswordModal = null, changePasswordModal = null, showPasswordModal = null;
 
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
       itemsListener = db.collection('items').onSnapshot(snapshot => {
         items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (callback) callback(items);
-        if (['inventory', 'borrowForm', 'myBorrows', 'borrowRequests', 'history', 'manageUsers'].includes(currentPage)) {
-          renderPage();
-        }
-      }, error => {
-        console.error('Items listener error:', error);
-        alert('Gagal mendapatkan data inventory real-time.');
-      });
+        if (['inventory', 'borrowForm', 'myBorrows', 'borrowRequests', 'history', 'manageUsers'].includes(currentPage)) renderPage();
+      }, error => console.error('Items listener error:', error));
     }
 
     function startRequestsListener(callback) {
@@ -357,64 +308,31 @@
       requestsListener = db.collection('borrow_requests').onSnapshot(snapshot => {
         requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (callback) callback(requests);
-        if (['myBorrows', 'borrowRequests', 'history'].includes(currentPage)) {
-          renderPage();
-        }
-      }, error => {
-        console.error('Requests listener error:', error);
-        alert('Gagal mendapatkan data peminjaman real-time.');
-      });
+        if (['myBorrows', 'borrowRequests', 'history'].includes(currentPage)) renderPage();
+      }, error => console.error('Requests listener error:', error));
     }
 
-    // ==================== FUNGSI CRUD ITEMS ====================
+    // ==================== CRUD ITEMS ====================
     async function addItem(itemData) {
-      try {
-        await db.collection('items').add(itemData);
-        return true;
-      } catch (error) {
-        console.error('Error adding item:', error);
-        alert('Gagal menambah barang: ' + error.message);
-        return false;
-      }
+      try { await db.collection('items').add(itemData); return true; } 
+      catch(e) { alert('Gagal menambah: ' + e.message); return false; }
     }
-
     async function updateItem(itemId, newData) {
-      try {
-        await db.collection('items').doc(itemId).update(newData);
-        return true;
-      } catch (error) {
-        console.error('Error updating item:', error);
-        alert('Gagal mengupdate barang: ' + error.message);
-        return false;
-      }
+      try { await db.collection('items').doc(itemId).update(newData); return true; } 
+      catch(e) { alert('Gagal update: ' + e.message); return false; }
+    }
+    async function deleteItemById(itemId) {
+      try { await db.collection('items').doc(itemId).delete(); return true; } 
+      catch(e) { alert('Gagal hapus: ' + e.message); return false; }
     }
 
-    async function deleteItem(itemId) {
-      try {
-        await db.collection('items').doc(itemId).delete();
-        return true;
-      } catch (error) {
-        console.error('Error deleting item:', error);
-        alert('Gagal menghapus barang: ' + error.message);
-        return false;
-      }
-    }
-
-    // ==================== FUNGSI CRUD USER ====================
-    function getAllUsers() {
-      return getUsers();
-    }
+    // ==================== CRUD USER ====================
+    function getAllUsers() { return getUsers(); }
     
     function addUser(userData) {
       const users = getUsers();
       const newId = 'u' + Date.now() + Math.random().toString(36).substr(2, 6);
-      const newUser = {
-        id: newId,
-        name: userData.name,
-        email: userData.email,
-        password: userData.password,
-        role: userData.role
-      };
+      const newUser = { id: newId, name: userData.name, email: userData.email, password: userData.password, role: userData.role };
       users.push(newUser);
       saveUsers(users);
       return newUser;
@@ -434,7 +352,7 @@
     function deleteUserById(userId) {
       const currentUser = getCurrentUser();
       if (currentUser && currentUser.id === userId) {
-        alert('Tidak dapat menghapus akun yang sedang aktif!');
+        alert('Tidak dapat menghapus akun sendiri!');
         return false;
       }
       const users = getUsers();
@@ -448,14 +366,19 @@
       const users = getUsers();
       return users.find(u => u.id === userId);
     }
+    
+    function getUserByEmail(email) {
+      const users = getUsers();
+      const found = users.find(u => u.email === email);
+      console.log('Mencari email:', email, 'Hasil:', found);
+      return found;
+    }
 
-    // Fungsi untuk generate password acak yang aman
     function generateRandomPassword(length = 10) {
       const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
       let password = "";
       for (let i = 0; i < length; i++) {
-        const randomIndex = Math.floor(Math.random() * charset.length);
-        password += charset[randomIndex];
+        password += charset[Math.floor(Math.random() * charset.length)];
       }
       return password;
     }
@@ -465,219 +388,136 @@
       document.getElementById('oldPassword').value = '';
       document.getElementById('newPassword').value = '';
       document.getElementById('confirmNewPassword').value = '';
-      const messageDiv = document.getElementById('changePasswordMessage');
-      messageDiv.classList.add('d-none');
-      messageDiv.innerHTML = '';
-      
-      if (!changePasswordModal) {
-        changePasswordModal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
-      }
+      const msgDiv = document.getElementById('changePasswordMessage');
+      msgDiv.classList.add('d-none');
+      if (!changePasswordModal) changePasswordModal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
       changePasswordModal.show();
     }
     
     function processChangePassword() {
-      const oldPassword = document.getElementById('oldPassword').value;
-      const newPassword = document.getElementById('newPassword').value;
-      const confirmPassword = document.getElementById('confirmNewPassword').value;
-      const messageDiv = document.getElementById('changePasswordMessage');
+      const oldPass = document.getElementById('oldPassword').value;
+      const newPass = document.getElementById('newPassword').value;
+      const confirmPass = document.getElementById('confirmNewPassword').value;
+      const msgDiv = document.getElementById('changePasswordMessage');
       const currentUser = getCurrentUser();
       
-      if (!currentUser) {
-        alert('Sesi login Anda telah habis. Silakan login kembali.');
-        if (changePasswordModal) changePasswordModal.hide();
-        navigate('login');
-        return;
-      }
-      
-      if (!oldPassword) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Password lama harus diisi.';
-        return;
-      }
-      
-      if (!newPassword) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Password baru harus diisi.';
-        return;
-      }
-      
-      if (newPassword.length < 4) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Password baru minimal 4 karakter.';
-        return;
-      }
-      
-      if (newPassword !== confirmPassword) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Konfirmasi password baru tidak cocok.';
-        return;
-      }
+      if (!currentUser) { alert('Sesi habis, login ulang'); changePasswordModal?.hide(); navigate('login'); return; }
+      if (!oldPass) { showMsg(msgDiv, 'danger', 'Password lama harus diisi'); return; }
+      if (!newPass) { showMsg(msgDiv, 'danger', 'Password baru harus diisi'); return; }
+      if (newPass.length < 4) { showMsg(msgDiv, 'danger', 'Password baru minimal 4 karakter'); return; }
+      if (newPass !== confirmPass) { showMsg(msgDiv, 'danger', 'Konfirmasi password tidak cocok'); return; }
       
       const users = getUsers();
       const user = users.find(u => u.id === currentUser.id);
+      if (!user || user.password !== oldPass) { showMsg(msgDiv, 'danger', 'Password lama salah'); return; }
       
-      if (!user || user.password !== oldPassword) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Password lama salah.';
-        return;
-      }
-      
-      updateUserById(currentUser.id, { password: newPassword });
-      setCurrentUser({ ...currentUser, password: newPassword });
-      
-      messageDiv.classList.remove('d-none');
-      messageDiv.classList.add('alert-success');
-      messageDiv.classList.remove('alert-danger');
-      messageDiv.innerHTML = '<i class="fas fa-check-circle"></i> Password berhasil diubah!';
-      
-      document.getElementById('oldPassword').value = '';
-      document.getElementById('newPassword').value = '';
-      document.getElementById('confirmNewPassword').value = '';
-      
-      setTimeout(() => {
-        if (changePasswordModal) changePasswordModal.hide();
-      }, 2000);
+      updateUserById(currentUser.id, { password: newPass });
+      setCurrentUser({ ...currentUser, password: newPass });
+      showMsg(msgDiv, 'success', 'Password berhasil diubah!');
+      setTimeout(() => changePasswordModal?.hide(), 1500);
+    }
+    
+    function showMsg(div, type, text) {
+      div.classList.remove('d-none', 'alert-success', 'alert-danger');
+      div.classList.add(`alert-${type}`);
+      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
     }
 
-    // ==================== FITUR LUPA PASSWORD (AMAN - TAMPIL DI LAYAR) ====================
+    // ==================== FITUR LUPA PASSWORD (DIPERBAIKI) ====================
     function showForgotPasswordModal() {
       document.getElementById('forgotEmail').value = '';
-      const messageDiv = document.getElementById('forgotPasswordMessage');
-      messageDiv.classList.add('d-none');
-      messageDiv.innerHTML = '';
-      
-      if (!forgotPasswordModal) {
-        forgotPasswordModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
-      }
+      const msgDiv = document.getElementById('forgotPasswordMessage');
+      msgDiv.classList.add('d-none');
+      msgDiv.innerHTML = '';
+      if (!forgotPasswordModal) forgotPasswordModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
       forgotPasswordModal.show();
     }
     
     function copyNewPassword() {
-      const passwordText = document.getElementById('newPasswordDisplay').innerText;
-      if (passwordText) {
-        navigator.clipboard.writeText(passwordText).then(() => {
-          // Tampilkan notifikasi sementara
-          const copyBtn = document.querySelector('#showPasswordModal .copy-btn');
-          const originalHtml = copyBtn.innerHTML;
-          copyBtn.innerHTML = '<i class="fas fa-check"></i> Tersalin!';
-          setTimeout(() => {
-            copyBtn.innerHTML = originalHtml;
-          }, 2000);
-        }).catch(() => {
-          alert('Gagal menyalin, silakan salin manual.');
+      const pwd = document.getElementById('newPasswordDisplay').innerText;
+      if (pwd) {
+        navigator.clipboard.writeText(pwd).then(() => {
+          const btn = document.querySelector('#showPasswordModal .copy-btn');
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-check"></i> Tersalin!';
+          setTimeout(() => btn.innerHTML = orig, 2000);
         });
       }
     }
     
     function closePasswordModalAndNavigate() {
       if (showPasswordModal) showPasswordModal.hide();
-      // Reset form dan navigasi ke login
       navigate('login');
     }
     
     async function processForgotPassword() {
       const email = document.getElementById('forgotEmail').value.trim();
-      const messageDiv = document.getElementById('forgotPasswordMessage');
+      const msgDiv = document.getElementById('forgotPasswordMessage');
       const sendBtn = document.getElementById('sendResetBtn');
       
       if (!email) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Silakan masukkan email Anda.';
+        showForgotMsg(msgDiv, 'danger', 'Silakan masukkan email Anda.');
         return;
       }
       
-      const users = getUsers();
-      const user = users.find(u => u.email === email);
+      // Cari user berdasarkan email
+      const user = getUserByEmail(email);
+      console.log('Email yang dicari:', email);
+      console.log('Semua user:', getUsers());
       
       if (!user) {
-        messageDiv.classList.remove('d-none');
-        messageDiv.classList.add('alert-danger');
-        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Email tidak ditemukan. Silakan hubungi Pengurus GSM untuk bantuan.';
+        showForgotMsg(msgDiv, 'danger', `Email "${email}" tidak ditemukan. Pastikan email sudah terdaftar.`);
         return;
       }
       
       sendBtn.disabled = true;
       sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
       
-      // Generate password acak yang aman
+      // Generate password baru
       const newPassword = generateRandomPassword(10);
-      lastResetPassword = newPassword;
       
-      // Update password di database
+      // Update password user
       updateUserById(user.id, { password: newPassword });
+      console.log(`Password untuk ${user.email} telah direset menjadi: ${newPassword}`);
       
       // Tutup modal lupa password
       if (forgotPasswordModal) forgotPasswordModal.hide();
       
       // Tampilkan modal dengan password baru
-      if (!showPasswordModal) {
-        showPasswordModal = new bootstrap.Modal(document.getElementById('showPasswordModal'));
-      }
+      if (!showPasswordModal) showPasswordModal = new bootstrap.Modal(document.getElementById('showPasswordModal'));
       document.getElementById('newPasswordDisplay').innerText = newPassword;
       showPasswordModal.show();
       
-      // Reset button
       sendBtn.disabled = false;
       sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Reset Password';
       document.getElementById('forgotEmail').value = '';
+    }
+    
+    function showForgotMsg(div, type, text) {
+      div.classList.remove('d-none', 'alert-danger', 'alert-success');
+      div.classList.add(`alert-${type}`);
+      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
     }
 
     // ==================== FUNGSI TOGGLE PASSWORD ====================
     function togglePasswordVisibility(inputId) {
       const input = document.getElementById(inputId);
       const icon = input.nextElementSibling;
-      
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-      } else {
-        input.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
-      }
+      if (input.type === 'password') { input.type = 'text'; icon.classList.replace('fa-eye', 'fa-eye-slash'); }
+      else { input.type = 'password'; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
     }
 
-    // ==================== UPLOAD GAMBAR ====================
-    function uploadImage(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(file);
-      });
+    // ==================== CRUD REQUESTS ====================
+    async function addRequest(reqData) {
+      try { await db.collection('borrow_requests').add(reqData); return true; } 
+      catch(e) { alert('Gagal ajukan: ' + e.message); return false; }
+    }
+    async function updateRequest(reqId, data) {
+      try { await db.collection('borrow_requests').doc(reqId).update(data); return true; } 
+      catch(e) { return false; }
     }
 
-    // ==================== FUNGSI CRUD REQUESTS ====================
-    async function addRequest(requestData) {
-      try {
-        await db.collection('borrow_requests').add(requestData);
-        return true;
-      } catch (error) {
-        console.error('Error adding request:', error);
-        alert('Gagal mengajukan peminjaman: ' + error.message);
-        return false;
-      }
-    }
-
-    async function updateRequest(requestId, newData) {
-      try {
-        await db.collection('borrow_requests').doc(requestId).update(newData);
-        return true;
-      } catch (error) {
-        console.error('Error updating request:', error);
-        alert('Gagal mengupdate peminjaman: ' + error.message);
-        return false;
-      }
-    }
-
-    // ==================== ROUTING & UI ====================
+    // ==================== ROUTING ====================
     function renderNav() {
       const user = getCurrentUser();
       const navLinks = document.getElementById('navLinks');
@@ -686,18 +526,14 @@
         userDisplay.innerText = `Halo, ${user.name} (${user.role === 'admin' ? 'Admin' : 'Peminjam'})`;
         let links = '';
         if (user.role === 'admin') {
-          links = `
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li>
+          links = `<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li>
             <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowRequests')">Permintaan</a></li>
             <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('history')">Riwayat</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('manageUsers')"><i class="fas fa-users"></i> Kelola User</a></li>
-          `;
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('manageUsers')"><i class="fas fa-users"></i> Kelola User</a></li>`;
         } else {
-          links = `
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li>
+          links = `<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li>
             <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowForm')">Pinjam Barang</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>
-          `;
+            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>`;
         }
         links += `<li class="nav-item"><a class="nav-link" href="#" onclick="showChangePasswordModal()"><i class="fas fa-key"></i> Ganti Password</a></li>`;
         navLinks.innerHTML = links;
@@ -709,71 +545,36 @@
 
     function navigate(page) {
       if (page === 'borrowForm' && !getCurrentUser()) {
-        alert('Anda harus login terlebih dahulu. Jika belum punya akun, silakan hubungi Pengurus GSM.');
+        alert('Harus login terlebih dahulu');
         currentPage = 'login';
-      } else {
-        currentPage = page;
-      }
+      } else { currentPage = page; }
       renderPage();
     }
 
     function renderPage() {
       const user = getCurrentUser();
-      if (!user && currentPage !== 'login') {
-        currentPage = 'login';
-      }
+      if (!user && currentPage !== 'login') currentPage = 'login';
       const content = document.getElementById('pageContent');
-      if (currentPage === 'login') {
-        content.innerHTML = renderLogin();
-      } else if (currentPage === 'inventory') {
-        content.innerHTML = renderInventory();
-      } else if (currentPage === 'borrowForm') {
-        content.innerHTML = renderBorrowForm();
-      } else if (currentPage === 'myBorrows') {
-        content.innerHTML = renderMyBorrows();
-      } else if (currentPage === 'borrowRequests') {
-        content.innerHTML = renderBorrowRequests();
-      } else if (currentPage === 'history') {
-        content.innerHTML = renderHistory();
-      } else if (currentPage === 'manageUsers') {
-        content.innerHTML = renderManageUsers();
-      }
+      if (currentPage === 'login') content.innerHTML = renderLogin();
+      else if (currentPage === 'inventory') content.innerHTML = renderInventory();
+      else if (currentPage === 'borrowForm') content.innerHTML = renderBorrowForm();
+      else if (currentPage === 'myBorrows') content.innerHTML = renderMyBorrows();
+      else if (currentPage === 'borrowRequests') content.innerHTML = renderBorrowRequests();
+      else if (currentPage === 'history') content.innerHTML = renderHistory();
+      else if (currentPage === 'manageUsers') content.innerHTML = renderManageUsers();
       renderNav();
     }
 
     // ==================== LOGIN ====================
     function renderLogin() {
-      return `
-        <div class="row justify-content-center">
-          <div class="col-md-6">
-            <div class="card">
-              <div class="card-header bg-primary text-white">Login</div>
-              <div class="card-body">
-                <div class="mb-3">
-                  <label>Email</label>
-                  <input type="email" id="loginEmail" class="form-control">
-                </div>
-                <div class="mb-3">
-                  <label>Password</label>
-                  <div class="password-wrapper">
-                    <input type="password" id="loginPassword" class="form-control">
-                    <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('loginPassword')"></i>
-                  </div>
-                </div>
-                <button class="btn btn-primary w-100" onclick="doLogin()">Login</button>
-                <hr>
-                <div class="text-center">
-                  <span class="forgot-password-link" onclick="showForgotPasswordModal()">
-                    <i class="fas fa-key"></i> Lupa Password?
-                  </span>
-                </div>
-                <hr>
-                <p class="text-muted text-center mb-0">Belum punya akun? Hubungi Pengurus GSM untuk registrasi.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+      return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div>
+        <div class="card-body">
+          <div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control"></div>
+          <div class="mb-3"><label>Password</label><div class="password-wrapper"><input type="password" id="loginPassword" class="form-control"><i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('loginPassword')"></i></div></div>
+          <button class="btn btn-primary w-100" onclick="doLogin()">Login</button>
+          <hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div>
+          <hr><p class="text-muted text-center mb-0">Belum punya akun? Hubungi Pengurus GSM untuk registrasi.</p>
+        </div></div></div></div>`;
     }
 
     function doLogin() {
@@ -801,51 +602,19 @@
     // ==================== MANAGE USERS ====================
     function renderManageUsers() {
       const currentUser = getCurrentUser();
-      if (!currentUser || currentUser.role !== 'admin') {
-        return '<div class="alert alert-danger">Akses ditolak. Hanya admin yang dapat mengelola user.</div>';
-      }
-      
+      if (!currentUser || currentUser.role !== 'admin') return '<div class="alert alert-danger">Akses ditolak.</div>';
       const users = getAllUsers();
-      
-      let html = `
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h3><i class="fas fa-users me-2"></i>Kelola Pengguna</h3>
-          <button class="btn btn-primary" onclick="showAddUserModal()">
-            <i class="fas fa-plus"></i> Tambah User
-          </button>
-        </div>
-        <div class="card">
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-bordered table-hover">
-                <thead class="table-light">
-                  <tr><th>#</th><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr>
-                </thead>
-                <tbody>
-      `;
-      
-      users.forEach((user, index) => {
-        const isCurrentUser = currentUser.id === user.id;
-        html += `
-          <tr>
-            <td>${index + 1}</td>
-            <td><div class="d-flex align-items-center"><div class="user-avatar me-2">${user.name.charAt(0).toUpperCase()}</div>${escapeHtml(user.name)} ${isCurrentUser ? '<small class="text-muted">(Anda)</small>' : ''}</div></td>
-            <td>${escapeHtml(user.email)}</td>
-            <td>
-              <select class="form-select form-select-sm" id="role-${user.id}" onchange="updateUserRole('${user.id}', this.value)">
-                <option value="borrower" ${user.role === 'borrower' ? 'selected' : ''}>Peminjam</option>
-                <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-              </select>
-            </td>
-            <td>
-              <button class="btn btn-sm btn-warning me-1" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button>
-              <button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}')" ${isCurrentUser ? 'disabled' : ''}><i class="fas fa-trash"></i></button>
-            </td>
-          </tr>
-        `;
+      let html = `<div class="d-flex justify-content-between mb-3"><h3><i class="fas fa-users"></i> Kelola Pengguna</h3>
+        <button class="btn btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Tambah User</button></div>
+        <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-bordered"><thead><tr><th>#</th><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`;
+      users.forEach((user, idx) => {
+        const isCurrent = currentUser.id === user.id;
+        html += `<tr><td>${idx+1}</td><td><div class="d-flex align-items-center"><div class="user-avatar me-2">${user.name.charAt(0)}</div>${escapeHtml(user.name)} ${isCurrent ? '<small>(Anda)</small>' : ''}</div></td>
+          <td>${escapeHtml(user.email)}</td>
+          <td><select class="form-select form-select-sm" id="role-${user.id}" onchange="updateUserRole('${user.id}', this.value)"><option value="borrower" ${user.role === 'borrower' ? 'selected' : ''}>Peminjam</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option></select></td>
+          <td><button class="btn btn-sm btn-warning me-1" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}')" ${isCurrent ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td></tr>`;
       });
-      
-      html += `</tbody></table></div></div></div>`;
+      html += `</tbody></table></div><div class="alert alert-info mt-3">Total: ${users.length} pengguna (${users.filter(u=>u.role==='admin').length} Admin, ${users.filter(u=>u.role==='borrower').length} Peminjam)</div></div></div>`;
       return html;
     }
     
@@ -853,17 +622,11 @@
       const user = getUserById(userId);
       if (!user) return;
       const currentUser = getCurrentUser();
-      
       if (currentUser && currentUser.id === userId) {
-        if (confirm('Anda mengubah role sendiri. Perubahan akan berlaku setelah login ulang.')) {
+        if (confirm('Anda mengubah role sendiri. Anda akan logout.')) {
           updateUserById(userId, { role: newRole });
-          const updatedUser = getUserById(userId);
-          setCurrentUser({ id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, role: updatedUser.role });
-          alert('Role berhasil diubah. Anda akan logout.');
-          setTimeout(() => logout(), 2000);
-        } else {
-          document.getElementById(`role-${userId}`).value = user.role;
-        }
+          setTimeout(() => logout(), 1500);
+        } else { document.getElementById(`role-${userId}`).value = user.role; }
         return;
       }
       updateUserById(userId, { role: newRole });
@@ -871,7 +634,7 @@
     }
     
     function showAddUserModal() {
-      document.getElementById('userModalTitle').innerText = 'Tambah User Baru';
+      document.getElementById('userModalTitle').innerText = 'Tambah User';
       document.getElementById('editUserId').value = '';
       document.getElementById('userName').value = '';
       document.getElementById('userEmail').value = '';
@@ -889,7 +652,7 @@
       document.getElementById('userName').value = user.name;
       document.getElementById('userEmail').value = user.email;
       document.getElementById('userPassword').value = '';
-      document.getElementById('userPassword').placeholder = 'Kosongkan jika tidak ingin mengubah password';
+      document.getElementById('userPassword').placeholder = 'Kosongkan jika tidak ingin ubah password';
       document.getElementById('userRole').value = user.role;
       if (!userModal) userModal = new bootstrap.Modal(document.getElementById('userModal'));
       userModal.show();
@@ -901,11 +664,9 @@
       const email = document.getElementById('userEmail').value.trim();
       const password = document.getElementById('userPassword').value;
       const role = document.getElementById('userRole').value;
-      
       if (!name || !email) return alert('Nama dan email harus diisi');
       const users = getAllUsers();
       if (users.some(u => u.email === email && u.id !== userId)) return alert('Email sudah digunakan');
-      
       if (!userId) {
         if (!password || password.length < 4) return alert('Password minimal 4 karakter');
         addUser({ name, email, password, role });
@@ -929,24 +690,22 @@
     function deleteUser(userId) {
       const user = getUserById(userId);
       if (!user) return;
-      if (!confirm(`Hapus user "${user.name}"?`)) return;
-      if (deleteUserById(userId)) {
-        alert('User dihapus!');
-        renderPage();
+      if (confirm(`Hapus user "${user.name}"?`)) {
+        if (deleteUserById(userId)) { alert('User dihapus!'); renderPage(); }
       }
     }
 
     // ==================== INVENTORY ====================
     function renderInventory() {
       const user = getCurrentUser();
-      if (!items.length && user) return '<div class="text-center spinner-border"></div>';
+      if (!items.length && user) return '<div class="text-center"><div class="spinner-border"></div></div>';
       let html = `<div class="d-flex justify-content-between mb-3"><h3>Daftar Inventory</h3><div>`;
       if (user?.role === 'admin') html += `<button class="btn btn-primary" onclick="showAddItemModal()"><i class="fas fa-plus"></i> Tambah</button>
-            <button class="btn btn-success ms-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import</button>`;
+        <button class="btn btn-success ms-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import</button>`;
       html += `</div></div><div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Nama</th><th>Kategori</th><th>Stok</th><th>Lokasi</th><th>Gambar</th><th>QR Code</th>${user?.role === 'admin' ? '<th>Aksi</th>' : ''}</tr></thead><tbody>`;
       items.forEach(item => {
         html += `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.category)}</td><td>${item.quantity}</td><td>${escapeHtml(item.location)}</td>
-        <td>${item.image ? `<img src="${item.image}" style="max-height:50px;" onclick="showItemDetail('${item.id}')">` : '-'}</td>
+        <td>${item.image ? `<img src="${item.image}" style="max-height:50px;cursor:pointer" onclick="showItemDetail('${item.id}')">` : '-'}</td>
         <td><div class="qr-code" id="qr-${item.id}" onclick="showItemDetail('${item.id}')"></div></td>
         ${user?.role === 'admin' ? `<td><button class="btn btn-sm btn-warning" onclick="editItem('${item.id}')"><i class="fas fa-edit"></i></button>
         <button class="btn btn-sm btn-danger ms-1" onclick="deleteItem('${item.id}')"><i class="fas fa-trash"></i></button></td>` : ''}</tr>`;
@@ -959,20 +718,20 @@
       return html;
     }
     
-    function escapeHtml(text) { if (!text) return ''; return text.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
+    function escapeHtml(text) { if (!text) return ''; return text.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
     
-    function showItemDetail(itemId) {
-      const item = items.find(i => i.id === itemId);
-      if (item) displayItemDetailModal(item);
-      else getItemById(itemId).then(i => i && displayItemDetailModal(i));
+    function showItemDetail(id) {
+      const item = items.find(i => i.id === id);
+      if (item) displayItemDetail(item);
+      else getItemById(id).then(i => i && displayItemDetail(i));
     }
     
-    async function getItemById(itemId) {
-      try { const doc = await db.collection('items').doc(itemId).get(); return doc.exists ? { id: doc.id, ...doc.data() } : null; } 
+    async function getItemById(id) {
+      try { const d = await db.collection('items').doc(id).get(); return d.exists ? { id: d.id, ...d.data() } : null; } 
       catch(e) { return null; }
     }
     
-    function displayItemDetailModal(item) {
+    function displayItemDetail(item) {
       document.getElementById('itemDetailBody').innerHTML = `<div class="text-center">${item.image ? `<img src="${item.image}" class="item-image">` : '<div class="alert alert-secondary">Tidak ada gambar</div>'}</div>
       <p><strong>Nama:</strong> ${escapeHtml(item.name)}</p><p><strong>Kategori:</strong> ${escapeHtml(item.category)}</p>
       <p><strong>Stok:</strong> ${item.quantity}</p><p><strong>Lokasi:</strong> ${escapeHtml(item.location)}</p>`;
@@ -981,77 +740,84 @@
     
     function showAddItemModal() {
       const name = prompt('Nama Barang:'); if (!name) return;
-      const category = prompt('Kategori:'); if (category === null) return;
-      const quantity = parseInt(prompt('Jumlah:') || '0'); if (isNaN(quantity)) return;
-      const location = prompt('Lokasi:'); if (location === null) return;
-      uploadContext = { mode: 'add', data: { name, category, quantity, location } };
+      const cat = prompt('Kategori:'); if (cat === null) return;
+      const qty = parseInt(prompt('Jumlah:') || '0'); if (isNaN(qty)) return;
+      const loc = prompt('Lokasi:'); if (loc === null) return;
+      uploadContext = { mode: 'add', data: { name, category: cat, quantity: qty, location: loc } };
       if (!imageOptionModal) imageOptionModal = new bootstrap.Modal(document.getElementById('imageOptionModal'));
       imageOptionModal.show();
     }
     
     async function editItem(id) {
       const item = items.find(i => i.id === id); if (!item) return;
-      const newName = prompt('Nama:', item.name); if (newName) item.name = newName;
-      const newCat = prompt('Kategori:', item.category); if (newCat) item.category = newCat;
-      const newQty = parseInt(prompt('Jumlah:', item.quantity)); if (!isNaN(newQty)) item.quantity = newQty;
-      const newLoc = prompt('Lokasi:', item.location); if (newLoc) item.location = newLoc;
+      const name = prompt('Nama:', item.name); if (name) item.name = name;
+      const cat = prompt('Kategori:', item.category); if (cat) item.category = cat;
+      const qty = parseInt(prompt('Jumlah:', item.quantity)); if (!isNaN(qty)) item.quantity = qty;
+      const loc = prompt('Lokasi:', item.location); if (loc) item.location = loc;
       uploadContext = { mode: 'edit', data: { name: item.name, category: item.category, quantity: item.quantity, location: item.location }, itemId: id, item };
       if (!imageOptionModal) imageOptionModal = new bootstrap.Modal(document.getElementById('imageOptionModal'));
       imageOptionModal.show();
     }
     
-    function triggerFileUpload() { if (imageOptionModal) imageOptionModal.hide(); document.getElementById('hiddenFileInput').click(); }
+    function triggerFileUpload() { imageOptionModal?.hide(); document.getElementById('hiddenFileInput').click(); }
     
     const fileInput = document.getElementById('hiddenFileInput');
     fileInput.onchange = async function(e) {
       const file = e.target.files[0]; if (!file) return;
       alert('Upload gambar...');
       try {
-        const imageUrl = await uploadImage(file);
-        if (uploadContext.mode === 'add') await saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, imageUrl);
-        else if (uploadContext.mode === 'edit') await updateItem(uploadContext.itemId, { ...uploadContext.data, image: imageUrl });
+        const imgUrl = await new Promise((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.readAsDataURL(file);
+        });
+        if (uploadContext.mode === 'add') await saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, imgUrl);
+        else if (uploadContext.mode === 'edit') await updateItem(uploadContext.itemId, { ...uploadContext.data, image: imgUrl });
       } catch(err) { alert('Gagal upload'); if (uploadContext.mode === 'add') await saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, ''); }
       fileInput.value = '';
     };
     
     function submitImageUrl() {
       const url = document.getElementById('imageUrlInput').value.trim();
-      if (imageOptionModal) imageOptionModal.hide();
+      imageOptionModal?.hide();
       if (uploadContext.mode === 'add') saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, url);
       else if (uploadContext.mode === 'edit') updateItem(uploadContext.itemId, { ...uploadContext.data, image: url });
       document.getElementById('imageUrlInput').value = '';
     }
     
     function skipImage() {
-      if (imageOptionModal) imageOptionModal.hide();
+      imageOptionModal?.hide();
       if (uploadContext.mode === 'add') saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, '');
       else if (uploadContext.mode === 'edit') updateItem(uploadContext.itemId, uploadContext.data);
     }
     
-    async function saveNewItem(name, category, quantity, location, img) {
-      await addItem({ name, category, quantity, location, image: img, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    async function saveNewItem(name, cat, qty, loc, img) {
+      await addItem({ name, category: cat, quantity: qty, location: loc, image: img, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
       alert('Barang ditambahkan!');
     }
     
-    async function deleteItem(id) { if (confirm('Hapus barang?')) await deleteItem(id); }
+    async function deleteItem(id) { if (confirm('Hapus barang?')) await deleteItemById(id); }
     
     function showImportModal() {
       const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls,.csv';
       input.onchange = e => {
         const file = e.target.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async ev => {
+        const r = new FileReader();
+        r.onload = async ev => {
           let rows = [];
-          if (file.name.endsWith('.csv')) Papa.parse(ev.target.result, { header: true, complete: r => importData(r.data) });
+          if (file.name.endsWith('.csv')) Papa.parse(ev.target.result, { header: true, complete: res => importData(res.data) });
           else { const wb = XLSX.read(ev.target.result, { type: 'binary' }); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); importData(rows); }
         };
-        file.name.endsWith('.csv') ? reader.readAsText(file) : reader.readAsBinaryString(file);
+        file.name.endsWith('.csv') ? r.readAsText(file) : r.readAsBinaryString(file);
       };
       input.click();
     }
     
-    async function importData(rows) { for (const row of rows) if (row.name) await addItem({ name: row.name, category: row.category || 'Umum', quantity: parseInt(row.quantity) || 0, location: row.location || 'Gudang', image: row.image || '', createdAt: firebase.firestore.FieldValue.serverTimestamp() }); alert('Import selesai'); }
-    
+    async function importData(rows) {
+      for (const row of rows) if (row.name) await addItem({ name: row.name, category: row.category || 'Umum', quantity: parseInt(row.quantity) || 0, location: row.location || 'Gudang', image: row.image || '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      alert('Import selesai');
+    }
+
     // ==================== PEMINJAMAN ====================
     function renderBorrowForm() {
       const user = getCurrentUser(); if (!user) return '<div class="alert alert-warning">Login dulu</div>';
@@ -1059,7 +825,7 @@
         <div class="mb-3"><label>Nama Peminjam</label><input type="text" class="form-control" value="${escapeHtml(user.name)}" readonly></div>
         <div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${items.map(i => `<option value="${i.id}">${escapeHtml(i.name)} (stok ${i.quantity})</option>`)}</select></div>
         <div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div>
-        <div class="mb-3"><label>Tanggal Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div class="mb-3"><label>Tgl Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div>
         <div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div>
         <div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div>
         <button class="btn btn-primary" onclick="submitBorrow()">Ajukan</button></div></div>`;
@@ -1077,9 +843,9 @@
     
     function renderMyBorrows() {
       const user = getCurrentUser(); if (!user) return '';
-      const myReqs = requests.filter(r => r.borrowerId === user.id);
-      if (!myReqs.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>';
-      return `<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>${myReqs.map(r => `<tr><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td>${r.status}</td></tr>`).join('')}</tbody></table>`;
+      const my = requests.filter(r => r.borrowerId === user.id);
+      if (!my.length) return '<h3>Peminjamanku</h3><p>Belum ada</p>';
+      return `<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>${my.map(r => `<tr><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td>${r.status}</td></tr>`).join('')}</tbody></table>`;
     }
     
     function renderBorrowRequests() {
@@ -1110,7 +876,7 @@
       if (itemId) {
         document.getElementById('pageContent').innerHTML = '<div class="text-center spinner-border"></div>';
         const item = await getItemById(itemId);
-        if (item) { document.getElementById('pageContent').innerHTML = ''; setTimeout(() => displayItemDetailModal(item), 300); }
+        if (item) { document.getElementById('pageContent').innerHTML = ''; setTimeout(() => displayItemDetail(item), 300); }
         else document.getElementById('pageContent').innerHTML = '<div class="alert alert-danger">Barang tidak ditemukan</div>';
       }
     }
