@@ -28,6 +28,8 @@
     .user-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #0d6efd; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
     .forgot-password-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
     .forgot-password-link:hover { color: #0a58ca; }
+    .register-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
+    .register-link:hover { color: #0a58ca; }
     .password-wrapper { position: relative; }
     .password-wrapper input { padding-right: 40px; }
     .toggle-password { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6c757d; z-index: 10; }
@@ -128,6 +130,50 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
           <button type="button" class="btn btn-primary" onclick="saveUser()">Simpan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Registrasi User Baru -->
+  <div class="modal fade" id="registerModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Registrasi Akun Baru</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Silakan isi data berikut untuk mendaftar.
+          </div>
+          <div class="mb-3">
+            <label>Nama Lengkap</label>
+            <input type="text" class="form-control" id="regName" placeholder="Masukkan nama lengkap" required>
+          </div>
+          <div class="mb-3">
+            <label>Email</label>
+            <input type="email" class="form-control" id="regEmail" placeholder="contoh@email.com" required>
+          </div>
+          <div class="mb-3">
+            <label>Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-control" id="regPassword" placeholder="Minimal 4 karakter">
+              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('regPassword')"></i>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label>Konfirmasi Password</label>
+            <div class="password-wrapper">
+              <input type="password" class="form-control" id="regConfirmPassword" placeholder="Konfirmasi password">
+              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('regConfirmPassword')"></i>
+            </div>
+          </div>
+          <div id="registerMessage" class="alert d-none"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-primary" onclick="processRegister()">Daftar</button>
         </div>
       </div>
     </div>
@@ -292,7 +338,7 @@
     let requestsListener = null;
     let currentPage = 'login';
     let uploadContext = { mode: null, data: null, itemId: null, item: null };
-    let imageOptionModal = null, userModal = null, forgotPasswordModal = null, changePasswordModal = null, showPasswordModal = null;
+    let imageOptionModal = null, userModal = null, forgotPasswordModal = null, changePasswordModal = null, showPasswordModal = null, registerModal = null;
 
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
@@ -332,7 +378,7 @@
     function addUser(userData) {
       const users = getUsers();
       const newId = 'u' + Date.now() + Math.random().toString(36).substr(2, 6);
-      const newUser = { id: newId, name: userData.name, email: userData.email, password: userData.password, role: userData.role };
+      const newUser = { id: newId, name: userData.name, email: userData.email, password: userData.password, role: userData.role || 'borrower' };
       users.push(newUser);
       saveUsers(users);
       return newUser;
@@ -383,6 +429,76 @@
       return password;
     }
 
+    // ==================== FITUR REGISTRASI ====================
+    function showRegisterModal() {
+      document.getElementById('regName').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPassword').value = '';
+      document.getElementById('regConfirmPassword').value = '';
+      const msgDiv = document.getElementById('registerMessage');
+      msgDiv.classList.add('d-none');
+      msgDiv.innerHTML = '';
+      if (!registerModal) registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
+      registerModal.show();
+    }
+    
+    function processRegister() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const confirmPassword = document.getElementById('regConfirmPassword').value;
+      const msgDiv = document.getElementById('registerMessage');
+      
+      if (!name) {
+        showRegisterMsg(msgDiv, 'danger', 'Nama lengkap harus diisi');
+        return;
+      }
+      if (!email) {
+        showRegisterMsg(msgDiv, 'danger', 'Email harus diisi');
+        return;
+      }
+      if (!password) {
+        showRegisterMsg(msgDiv, 'danger', 'Password harus diisi');
+        return;
+      }
+      if (password.length < 4) {
+        showRegisterMsg(msgDiv, 'danger', 'Password minimal 4 karakter');
+        return;
+      }
+      if (password !== confirmPassword) {
+        showRegisterMsg(msgDiv, 'danger', 'Konfirmasi password tidak cocok');
+        return;
+      }
+      
+      // Cek apakah email sudah terdaftar
+      const existingUser = getUserByEmail(email);
+      if (existingUser) {
+        showRegisterMsg(msgDiv, 'danger', 'Email sudah terdaftar! Silakan login.');
+        return;
+      }
+      
+      // Tambah user baru
+      addUser({ name, email, password, role: 'borrower' });
+      showRegisterMsg(msgDiv, 'success', 'Registrasi berhasil! Silakan login.');
+      
+      // Clear form
+      document.getElementById('regName').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPassword').value = '';
+      document.getElementById('regConfirmPassword').value = '';
+      
+      // Tutup modal setelah 2 detik
+      setTimeout(() => {
+        if (registerModal) registerModal.hide();
+      }, 2000);
+    }
+    
+    function showRegisterMsg(div, type, text) {
+      div.classList.remove('d-none', 'alert-danger', 'alert-success');
+      div.classList.add(`alert-${type}`);
+      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
+    }
+
     // ==================== FITUR GANTI PASSWORD ====================
     function showChangePasswordModal() {
       document.getElementById('oldPassword').value = '';
@@ -423,7 +539,7 @@
       div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
     }
 
-    // ==================== FITUR LUPA PASSWORD (DIPERBAIKI) ====================
+    // ==================== FITUR LUPA PASSWORD ====================
     function showForgotPasswordModal() {
       document.getElementById('forgotEmail').value = '';
       const msgDiv = document.getElementById('forgotPasswordMessage');
@@ -462,11 +578,10 @@
       
       // Cari user berdasarkan email
       const user = getUserByEmail(email);
-      console.log('Email yang dicari:', email);
-      console.log('Semua user:', getUsers());
       
       if (!user) {
-        showForgotMsg(msgDiv, 'danger', `Email "${email}" tidak ditemukan. Pastikan email sudah terdaftar.`);
+        // Tampilkan pesan dengan link registrasi
+        showForgotMsg(msgDiv, 'warning', `Email "${email}" tidak ditemukan. <a href="#" class="register-link" onclick="closeForgotModalAndShowRegister('${email}')">Klik di sini untuk registrasi</a>`);
         return;
       }
       
@@ -493,10 +608,16 @@
       document.getElementById('forgotEmail').value = '';
     }
     
+    function closeForgotModalAndShowRegister(email) {
+      if (forgotPasswordModal) forgotPasswordModal.hide();
+      showRegisterModal();
+      if (email) document.getElementById('regEmail').value = email;
+    }
+    
     function showForgotMsg(div, type, text) {
-      div.classList.remove('d-none', 'alert-danger', 'alert-success');
+      div.classList.remove('d-none', 'alert-danger', 'alert-success', 'alert-warning');
       div.classList.add(`alert-${type}`);
-      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
+      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'exclamation-triangle'}"></i> ${text}`;
     }
 
     // ==================== FUNGSI TOGGLE PASSWORD ====================
@@ -572,8 +693,13 @@
           <div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control"></div>
           <div class="mb-3"><label>Password</label><div class="password-wrapper"><input type="password" id="loginPassword" class="form-control"><i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('loginPassword')"></i></div></div>
           <button class="btn btn-primary w-100" onclick="doLogin()">Login</button>
-          <hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div>
-          <hr><p class="text-muted text-center mb-0">Belum punya akun? Hubungi Pengurus GSM untuk registrasi.</p>
+          <hr>
+          <div class="text-center mb-2">
+            <span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span>
+          </div>
+          <div class="text-center">
+            <span class="register-link" onclick="showRegisterModal()"><i class="fas fa-user-plus"></i> Belum punya akun? Daftar di sini</span>
+          </div>
         </div></div></div></div>`;
     }
 
@@ -612,7 +738,8 @@
         html += `<tr><td>${idx+1}</td><td><div class="d-flex align-items-center"><div class="user-avatar me-2">${user.name.charAt(0)}</div>${escapeHtml(user.name)} ${isCurrent ? '<small>(Anda)</small>' : ''}</div></td>
           <td>${escapeHtml(user.email)}</td>
           <td><select class="form-select form-select-sm" id="role-${user.id}" onchange="updateUserRole('${user.id}', this.value)"><option value="borrower" ${user.role === 'borrower' ? 'selected' : ''}>Peminjam</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option></select></td>
-          <td><button class="btn btn-sm btn-warning me-1" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}')" ${isCurrent ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td></tr>`;
+          <td><button class="btn btn-sm btn-warning me-1" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}')" ${isCurrent ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td>
+        </tr>`;
       });
       html += `</tbody></table></div><div class="alert alert-info mt-3">Total: ${users.length} pengguna (${users.filter(u=>u.role==='admin').length} Admin, ${users.filter(u=>u.role==='borrower').length} Peminjam)</div></div></div>`;
       return html;
