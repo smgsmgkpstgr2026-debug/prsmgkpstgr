@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Aplikasi Inventory & Peminjaman (Sync Total)</title>
+  <title>Aplikasi Inventory & Peminjaman (Sync Total) + Kolom Excel + Hapus Massal</title>
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome Icons -->
@@ -24,19 +24,11 @@
     .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; }
     #hiddenFileInput { display: none; }
-    .qr-code { width: 150px; height: 150px; cursor: pointer; margin: 0 auto; }
+    .qr-code { width: 100px; height: 100px; cursor: pointer; margin: 0 auto; }
     .user-avatar { width: 40px; height: 40px; border-radius: 50%; background-color: #0d6efd; color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
     .forgot-password-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
     .forgot-password-link:hover { color: #0a58ca; }
-    .register-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
-    .register-link:hover { color: #0a58ca; }
-    .password-wrapper { position: relative; }
-    .password-wrapper input { padding-right: 40px; }
-    .toggle-password { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6c757d; z-index: 10; }
-    .toggle-password:hover { color: #0d6efd; }
-    .new-password-display { font-family: monospace; font-size: 1.2rem; font-weight: bold; background-color: #f0f0f0; padding: 10px; border-radius: 5px; text-align: center; letter-spacing: 1px; word-break: break-all; }
-    .copy-btn { cursor: pointer; transition: all 0.2s; }
-    .copy-btn:hover { transform: scale(1.05); }
+    .delete-selected-btn { margin-right: 10px; }
   </style>
 </head>
 <body>
@@ -72,211 +64,59 @@
     </div>
   </div>
 
-  <!-- Modal untuk pilihan gambar -->
-  <div class="modal fade" id="imageOptionModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Pilih Gambar</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Upload file dari komputer</label>
-            <button class="btn btn-primary w-100" onclick="triggerFileUpload()"><i class="fas fa-upload"></i> Pilih File</button>
-          </div>
-          <hr>
-          <div class="mb-3">
-            <label for="imageUrlInput" class="form-label">Atau masukkan URL gambar</label>
-            <input type="url" class="form-control" id="imageUrlInput" placeholder="https://...">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-success" onclick="submitImageUrl()">Gunakan URL</button>
-          <button type="button" class="btn btn-info" onclick="skipImage()">Lewati</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal untuk CRUD User -->
-  <div class="modal fade" id="userModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="userModalTitle">Tambah User</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" id="editUserId">
-          <div class="mb-3"><label>Nama Lengkap</label><input type="text" class="form-control" id="userName" required></div>
-          <div class="mb-3"><label>Email</label><input type="email" class="form-control" id="userEmail" required></div>
-          <div class="mb-3">
-            <label>Password</label>
-            <div class="password-wrapper">
-              <input type="password" class="form-control" id="userPassword" placeholder="Minimal 4 karakter">
-              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('userPassword')"></i>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label>Role</label>
-            <select class="form-select" id="userRole">
-              <option value="borrower">Peminjam</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" onclick="saveUser()">Simpan</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Registrasi User Baru -->
-  <div class="modal fade" id="registerModal" tabindex="-1">
-    <div class="modal-dialog">
+  <!-- MODAL UNTUK TAMBAH / EDIT BARANG (LENGKAP) -->
+  <div class="modal fade" id="itemFormModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Registrasi Akun Baru</h5>
+          <h5 class="modal-title" id="itemFormTitle">Tambah Barang</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> Silakan isi data berikut untuk mendaftar.
+          <input type="hidden" id="editItemId">
+          <div class="row">
+            <div class="col-md-6 mb-3"><label class="form-label">Nama Barang *</label><input type="text" class="form-control" id="itemName" required></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Kategori</label><input type="text" class="form-control" id="itemCategory"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Jumlah (Stok)</label><input type="number" class="form-control" id="itemQuantity" value="0"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Lokasi</label><input type="text" class="form-control" id="itemLocation"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Type (Merk/Model)</label><input type="text" class="form-control" id="itemType"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Lama (jumlah lama)</label><input type="text" class="form-control" id="itemLama"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Baru (jumlah baru)</label><input type="text" class="form-control" id="itemBaru"></div>
+            <div class="col-md-3 mb-3"><label class="form-label">Status</label><select class="form-select" id="itemStatus"><option value="Baik">Baik</option><option value="Rusak">Rusak</option><option value="Perbaikan">Perbaikan</option></select></div>
+            <div class="col-md-6 mb-3"><label class="form-label">Catatan</label><textarea class="form-control" id="itemNotes" rows="2"></textarea></div>
+            <div class="col-md-6 mb-3"><label class="form-label">URL Gambar</label><div class="input-group"><input type="text" class="form-control" id="itemImageUrl"><button class="btn btn-outline-secondary" type="button" onclick="triggerFileUploadForItem()"><i class="fas fa-upload"></i> Upload</button></div></div>
           </div>
-          <div class="mb-3">
-            <label>Nama Lengkap</label>
-            <input type="text" class="form-control" id="regName" placeholder="Masukkan nama lengkap" required>
-          </div>
-          <div class="mb-3">
-            <label>Email</label>
-            <input type="email" class="form-control" id="regEmail" placeholder="contoh@email.com" required>
-          </div>
-          <div class="mb-3">
-            <label>Password</label>
-            <div class="password-wrapper">
-              <input type="password" class="form-control" id="regPassword" placeholder="Minimal 4 karakter">
-              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('regPassword')"></i>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label>Konfirmasi Password</label>
-            <div class="password-wrapper">
-              <input type="password" class="form-control" id="regConfirmPassword" placeholder="Konfirmasi password">
-              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('regConfirmPassword')"></i>
-            </div>
-          </div>
-          <div id="registerMessage" class="alert d-none"></div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" onclick="processRegister()">Daftar</button>
-        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" onclick="saveItemFromModal()">Simpan Barang</button></div>
       </div>
     </div>
   </div>
 
-  <!-- Modal Ganti Password -->
-  <div class="modal fade" id="changePasswordModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-key me-2"></i>Ganti Password</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label>Password Lama</label>
-            <div class="password-wrapper">
-              <input type="password" class="form-control" id="oldPassword" placeholder="Masukkan password lama">
-              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('oldPassword')"></i>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label>Password Baru</label>
-            <div class="password-wrapper">
-              <input type="password" class="form-control" id="newPassword" placeholder="Minimal 4 karakter">
-              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('newPassword')"></i>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label>Konfirmasi Password Baru</label>
-            <div class="password-wrapper">
-              <input type="password" class="form-control" id="confirmNewPassword" placeholder="Konfirmasi password baru">
-              <i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('confirmNewPassword')"></i>
-            </div>
-          </div>
-          <div id="changePasswordMessage" class="alert d-none"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" onclick="processChangePassword()">Ganti Password</button>
-        </div>
-      </div>
-    </div>
+  <!-- Modal untuk pilihan gambar (legacy) -->
+  <div class="modal fade" id="imageOptionModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Pilih Gambar</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><div class="mb-3"><button class="btn btn-primary w-100" onclick="triggerFileUpload()"><i class="fas fa-upload"></i> Pilih File</button></div><hr><div class="mb-3"><label for="imageUrlInput" class="form-label">Atau URL gambar</label><input type="url" class="form-control" id="imageUrlInput"></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-success" onclick="submitImageUrl()">Gunakan URL</button><button type="button" class="btn btn-info" onclick="skipImage()">Lewati</button></div></div></div>
+  </div>
+
+  <!-- Modal CRUD User -->
+  <div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="userModalTitle">Tambah User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><input type="hidden" id="editUserId"><div class="mb-3"><label>Nama Lengkap</label><input type="text" class="form-control" id="userName" required></div>
+    <div class="mb-3"><label>Email</label><input type="email" class="form-control" id="userEmail" required></div>
+    <div class="mb-3"><label>Password</label><input type="password" class="form-control" id="userPassword" placeholder="Minimal 4 karakter"></div>
+    <div class="mb-3"><label>Role</label><select class="form-select" id="userRole"><option value="borrower">Peminjam</option><option value="admin">Admin</option></select></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" onclick="saveUser()">Simpan</button></div></div></div>
   </div>
 
   <!-- Modal Lupa Password -->
   <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-key me-2"></i>Lupa Password</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> Masukkan email yang terdaftar untuk mereset password.
-          </div>
-          <div class="mb-3">
-            <label>Email</label>
-            <input type="email" class="form-control" id="forgotEmail" placeholder="contoh@email.com">
-          </div>
-          <div id="forgotPasswordMessage" class="alert d-none"></div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-          <button type="button" class="btn btn-primary" id="sendResetBtn" onclick="processForgotPassword()">Reset Password</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Tampilkan Password Baru -->
-  <div class="modal fade" id="showPasswordModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header bg-success text-white">
-          <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Password Berhasil Direset</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i> <strong>Penting!</strong> Salin password baru Anda di bawah ini.
-          </div>
-          <div class="text-center mb-3">
-            <label class="form-label fw-bold">Password Baru Anda:</label>
-            <div class="new-password-display" id="newPasswordDisplay"></div>
-            <button class="btn btn-outline-primary mt-2 copy-btn" onclick="copyNewPassword()">
-              <i class="fas fa-copy"></i> Salin Password
-            </button>
-          </div>
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> Setelah login, segera ganti password Anda melalui menu <strong>Ganti Password</strong>.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-success" data-bs-dismiss="modal" onclick="closePasswordModalAndNavigate()">Saya sudah menyalin</button>
-        </div>
-      </div>
-    </div>
+    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"><i class="fas fa-key me-2"></i>Lupa Password</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><div class="alert alert-info">Masukkan email Anda, kami akan mereset password.</div><div class="mb-3"><label>Email</label><input type="email" class="form-control" id="forgotEmail"></div><div id="forgotPasswordMessage" class="alert d-none"></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" onclick="processForgotPassword()">Kirim</button></div></div></div>
   </div>
 
   <input type="file" id="hiddenFileInput" accept="image/*">
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // ==================== KONFIGURASI FIREBASE ====================
@@ -293,726 +133,225 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // ==================== DATA STORAGE ====================
+    // ==================== LOCAL STORAGE USERS ====================
     const STORAGE_KEYS = { USERS: 'inventory_users', CURRENT_USER: 'current_user' };
-
-    // Inisialisasi data user default
     function initLocalData() {
-      let users = localStorage.getItem(STORAGE_KEYS.USERS);
-      if (!users) {
-        const defaultUsers = [
+      if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([
           { id: 'u1', name: 'Admin', email: 'admin@inv.com', password: 'admin', role: 'admin' },
           { id: 'u2', name: 'Borrower', email: 'user@inv.com', password: 'user', role: 'borrower' }
-        ];
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(defaultUsers));
-        console.log('Data user default telah diinisialisasi:', defaultUsers);
-      } else {
-        console.log('Data user yang ada:', JSON.parse(users));
+        ]));
       }
     }
     initLocalData();
+    function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)); }
+    function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
+    function setCurrentUser(user) { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)); }
+    function saveUsers(users) { localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users)); }
 
-    function getUsers() { 
-      const users = localStorage.getItem(STORAGE_KEYS.USERS);
-      return users ? JSON.parse(users) : [];
-    }
-    
-    function getCurrentUser() { 
-      const user = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      return user ? JSON.parse(user) : null;
-    }
-    
-    function setCurrentUser(user) { 
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-    }
-    
-    function saveUsers(users) {
-      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-      console.log('User tersimpan:', users);
-    }
-
-    // ==================== GLOBAL VARIABLES ====================
+    // ==================== GLOBAL ====================
     let items = [];
     let requests = [];
     let itemsListener = null;
     let requestsListener = null;
     let currentPage = 'login';
-    let uploadContext = { mode: null, data: null, itemId: null, item: null };
-    let imageOptionModal = null, userModal = null, forgotPasswordModal = null, changePasswordModal = null, showPasswordModal = null, registerModal = null;
+    let itemFormModalObj = null;
 
+    // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
       itemsListener = db.collection('items').onSnapshot(snapshot => {
         items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (callback) callback(items);
         if (['inventory', 'borrowForm', 'myBorrows', 'borrowRequests', 'history', 'manageUsers'].includes(currentPage)) renderPage();
-      }, error => console.error('Items listener error:', error));
+      }, error => { console.error(error); alert('Gagal sync inventory'); });
     }
-
     function startRequestsListener(callback) {
       if (requestsListener) requestsListener();
       requestsListener = db.collection('borrow_requests').onSnapshot(snapshot => {
         requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (callback) callback(requests);
         if (['myBorrows', 'borrowRequests', 'history'].includes(currentPage)) renderPage();
-      }, error => console.error('Requests listener error:', error));
+      }, error => { console.error(error); alert('Gagal sync peminjaman'); });
     }
 
     // ==================== CRUD ITEMS ====================
-    async function addItem(itemData) {
-      try { await db.collection('items').add(itemData); return true; } 
-      catch(e) { alert('Gagal menambah: ' + e.message); return false; }
-    }
-    async function updateItem(itemId, newData) {
-      try { await db.collection('items').doc(itemId).update(newData); return true; } 
-      catch(e) { alert('Gagal update: ' + e.message); return false; }
-    }
-    async function deleteItemById(itemId) {
-      try { await db.collection('items').doc(itemId).delete(); return true; } 
-      catch(e) { alert('Gagal hapus: ' + e.message); return false; }
-    }
+    async function addItem(itemData) { try { await db.collection('items').add(itemData); return true; } catch(e){ alert(e.message); return false; } }
+    async function updateItem(itemId, newData) { try { await db.collection('items').doc(itemId).update(newData); return true; } catch(e){ alert(e.message); return false; } }
+    async function deleteItem(itemId) { try { await db.collection('items').doc(itemId).delete(); return true; } catch(e){ alert(e.message); return false; } }
 
     // ==================== CRUD USER ====================
     function getAllUsers() { return getUsers(); }
-    
-    function addUser(userData) {
-      const users = getUsers();
-      const newId = 'u' + Date.now() + Math.random().toString(36).substr(2, 6);
-      const newUser = { id: newId, name: userData.name, email: userData.email, password: userData.password, role: userData.role || 'borrower' };
-      users.push(newUser);
-      saveUsers(users);
-      return newUser;
-    }
-    
-    function updateUserById(userId, userData) {
-      const users = getUsers();
-      const index = users.findIndex(u => u.id === userId);
-      if (index !== -1) {
-        users[index] = { ...users[index], ...userData };
-        saveUsers(users);
-        return true;
-      }
-      return false;
-    }
-    
-    function deleteUserById(userId) {
-      const currentUser = getCurrentUser();
-      if (currentUser && currentUser.id === userId) {
-        alert('Tidak dapat menghapus akun sendiri!');
-        return false;
-      }
-      const users = getUsers();
-      const filteredUsers = users.filter(u => u.id !== userId);
-      if (filteredUsers.length === users.length) return false;
-      saveUsers(filteredUsers);
-      return true;
-    }
-    
-    function getUserById(userId) {
-      const users = getUsers();
-      return users.find(u => u.id === userId);
-    }
-    
-    function getUserByEmail(email) {
-      const users = getUsers();
-      const found = users.find(u => u.email === email);
-      console.log('Mencari email:', email, 'Hasil:', found);
-      return found;
-    }
+    function addUser(userData) { const users = getUsers(); const newId = 'u' + Date.now() + Math.random().toString(36).substr(2,6); users.push({ id:newId, ...userData }); saveUsers(users); return newId; }
+    function updateUserById(userId, userData) { const users = getUsers(); const idx = users.findIndex(u=>u.id===userId); if(idx!==-1){ users[idx]={...users[idx], ...userData}; saveUsers(users); return true; } return false; }
+    function deleteUserById(userId) { if(getCurrentUser()?.id===userId){ alert('Tidak bisa hapus akun sendiri'); return false; } const users = getUsers().filter(u=>u.id!==userId); if(users.length===getUsers().length) return false; saveUsers(users); return true; }
+    function getUserById(userId) { return getUsers().find(u=>u.id===userId); }
 
-    function generateRandomPassword(length = 10) {
-      const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-      let password = "";
-      for (let i = 0; i < length; i++) {
-        password += charset[Math.floor(Math.random() * charset.length)];
-      }
-      return password;
-    }
+    // ==================== LUPA PASSWORD ====================
+    let forgotPasswordModal;
+    function showForgotPasswordModal() { document.getElementById('forgotEmail').value=''; document.getElementById('forgotPasswordMessage').classList.add('d-none'); if(!forgotPasswordModal) forgotPasswordModal=new bootstrap.Modal(document.getElementById('forgotPasswordModal')); forgotPasswordModal.show(); }
+    function processForgotPassword() { const email=document.getElementById('forgotEmail').value.trim(); const msgDiv=document.getElementById('forgotPasswordMessage'); if(!email){ msgDiv.classList.remove('d-none'); msgDiv.classList.add('alert-danger'); msgDiv.innerHTML='Email harus diisi'; return; } const user=getUsers().find(u=>u.email===email); if(!user){ msgDiv.classList.remove('d-none'); msgDiv.classList.add('alert-danger'); msgDiv.innerHTML='Email tidak ditemukan'; return; } const tempPass=user.name.toLowerCase().replace(/\s/g,'')+Math.floor(Math.random()*1000); updateUserById(user.id,{password:tempPass}); msgDiv.classList.remove('d-none'); msgDiv.classList.add('alert-success'); msgDiv.innerHTML=`Password baru: <strong>${tempPass}</strong>`; setTimeout(()=>forgotPasswordModal?.hide(),4000); }
 
-    // ==================== FITUR REGISTRASI ====================
-    function showRegisterModal() {
-      document.getElementById('regName').value = '';
-      document.getElementById('regEmail').value = '';
-      document.getElementById('regPassword').value = '';
-      document.getElementById('regConfirmPassword').value = '';
-      const msgDiv = document.getElementById('registerMessage');
-      msgDiv.classList.add('d-none');
-      msgDiv.innerHTML = '';
-      if (!registerModal) registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
-      registerModal.show();
-    }
-    
-    function processRegister() {
-      const name = document.getElementById('regName').value.trim();
-      const email = document.getElementById('regEmail').value.trim();
-      const password = document.getElementById('regPassword').value;
-      const confirmPassword = document.getElementById('regConfirmPassword').value;
-      const msgDiv = document.getElementById('registerMessage');
-      
-      if (!name) {
-        showRegisterMsg(msgDiv, 'danger', 'Nama lengkap harus diisi');
-        return;
-      }
-      if (!email) {
-        showRegisterMsg(msgDiv, 'danger', 'Email harus diisi');
-        return;
-      }
-      if (!password) {
-        showRegisterMsg(msgDiv, 'danger', 'Password harus diisi');
-        return;
-      }
-      if (password.length < 4) {
-        showRegisterMsg(msgDiv, 'danger', 'Password minimal 4 karakter');
-        return;
-      }
-      if (password !== confirmPassword) {
-        showRegisterMsg(msgDiv, 'danger', 'Konfirmasi password tidak cocok');
-        return;
-      }
-      
-      // Cek apakah email sudah terdaftar
-      const existingUser = getUserByEmail(email);
-      if (existingUser) {
-        showRegisterMsg(msgDiv, 'danger', 'Email sudah terdaftar! Silakan login.');
-        return;
-      }
-      
-      // Tambah user baru
-      addUser({ name, email, password, role: 'borrower' });
-      showRegisterMsg(msgDiv, 'success', 'Registrasi berhasil! Silakan login.');
-      
-      // Clear form
-      document.getElementById('regName').value = '';
-      document.getElementById('regEmail').value = '';
-      document.getElementById('regPassword').value = '';
-      document.getElementById('regConfirmPassword').value = '';
-      
-      // Tutup modal setelah 2 detik
-      setTimeout(() => {
-        if (registerModal) registerModal.hide();
-      }, 2000);
-    }
-    
-    function showRegisterMsg(div, type, text) {
-      div.classList.remove('d-none', 'alert-danger', 'alert-success');
-      div.classList.add(`alert-${type}`);
-      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
-    }
+    // ==================== UPLOAD GAMBAR ====================
+    function uploadImage(file) { return new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=e=>resolve(e.target.result); reader.onerror=reject; reader.readAsDataURL(file); }); }
+    function triggerFileUploadForItem() { const input=document.getElementById('hiddenFileInput'); input.onchange=async(e)=>{ const file=e.target.files[0]; if(file) try{ const base64=await uploadImage(file); document.getElementById('itemImageUrl').value=base64; alert('Gambar siap'); }catch(err){ alert('Gagal upload'); } input.value=''; }; input.click(); }
 
-    // ==================== FITUR GANTI PASSWORD ====================
-    function showChangePasswordModal() {
-      document.getElementById('oldPassword').value = '';
-      document.getElementById('newPassword').value = '';
-      document.getElementById('confirmNewPassword').value = '';
-      const msgDiv = document.getElementById('changePasswordMessage');
-      msgDiv.classList.add('d-none');
-      if (!changePasswordModal) changePasswordModal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
-      changePasswordModal.show();
-    }
-    
-    function processChangePassword() {
-      const oldPass = document.getElementById('oldPassword').value;
-      const newPass = document.getElementById('newPassword').value;
-      const confirmPass = document.getElementById('confirmNewPassword').value;
-      const msgDiv = document.getElementById('changePasswordMessage');
-      const currentUser = getCurrentUser();
-      
-      if (!currentUser) { alert('Sesi habis, login ulang'); changePasswordModal?.hide(); navigate('login'); return; }
-      if (!oldPass) { showMsg(msgDiv, 'danger', 'Password lama harus diisi'); return; }
-      if (!newPass) { showMsg(msgDiv, 'danger', 'Password baru harus diisi'); return; }
-      if (newPass.length < 4) { showMsg(msgDiv, 'danger', 'Password baru minimal 4 karakter'); return; }
-      if (newPass !== confirmPass) { showMsg(msgDiv, 'danger', 'Konfirmasi password tidak cocok'); return; }
-      
-      const users = getUsers();
-      const user = users.find(u => u.id === currentUser.id);
-      if (!user || user.password !== oldPass) { showMsg(msgDiv, 'danger', 'Password lama salah'); return; }
-      
-      updateUserById(currentUser.id, { password: newPass });
-      setCurrentUser({ ...currentUser, password: newPass });
-      showMsg(msgDiv, 'success', 'Password berhasil diubah!');
-      setTimeout(() => changePasswordModal?.hide(), 1500);
-    }
-    
-    function showMsg(div, type, text) {
-      div.classList.remove('d-none', 'alert-success', 'alert-danger');
-      div.classList.add(`alert-${type}`);
-      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${text}`;
-    }
+    // ==================== MODAL ITEM ====================
+    function showAddItemModal() { resetItemForm(); document.getElementById('editItemId').value=''; document.getElementById('itemFormTitle').innerText='Tambah Barang'; if(!itemFormModalObj) itemFormModalObj=new bootstrap.Modal(document.getElementById('itemFormModal')); itemFormModalObj.show(); }
+    function editItem(id) { const item=items.find(i=>i.id===id); if(!item) return; resetItemForm(); document.getElementById('editItemId').value=item.id; document.getElementById('itemName').value=item.name||''; document.getElementById('itemCategory').value=item.category||''; document.getElementById('itemQuantity').value=item.quantity||0; document.getElementById('itemLocation').value=item.location||''; document.getElementById('itemType').value=item.type||''; document.getElementById('itemLama').value=item.lama||''; document.getElementById('itemBaru').value=item.baru||''; document.getElementById('itemStatus').value=item.status||'Baik'; document.getElementById('itemNotes').value=item.notes||''; document.getElementById('itemImageUrl').value=item.image||''; document.getElementById('itemFormTitle').innerText='Edit Barang'; if(!itemFormModalObj) itemFormModalObj=new bootstrap.Modal(document.getElementById('itemFormModal')); itemFormModalObj.show(); }
+    function resetItemForm() { document.getElementById('itemName').value=''; document.getElementById('itemCategory').value=''; document.getElementById('itemQuantity').value='0'; document.getElementById('itemLocation').value=''; document.getElementById('itemType').value=''; document.getElementById('itemLama').value=''; document.getElementById('itemBaru').value=''; document.getElementById('itemStatus').value='Baik'; document.getElementById('itemNotes').value=''; document.getElementById('itemImageUrl').value=''; }
+    async function saveItemFromModal() { const id=document.getElementById('editItemId').value; const name=document.getElementById('itemName').value.trim(); if(!name){ alert('Nama wajib'); return; } const data={ name, category:document.getElementById('itemCategory').value.trim(), quantity:parseInt(document.getElementById('itemQuantity').value)||0, location:document.getElementById('itemLocation').value.trim(), type:document.getElementById('itemType').value.trim(), lama:document.getElementById('itemLama').value.trim(), baru:document.getElementById('itemBaru').value.trim(), status:document.getElementById('itemStatus').value, notes:document.getElementById('itemNotes').value.trim(), image:document.getElementById('itemImageUrl').value.trim(), updatedAt:firebase.firestore.FieldValue.serverTimestamp() }; if(!id) { data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await addItem(data); alert('Tambah berhasil'); } else { await updateItem(id,data); alert('Update berhasil'); } if(itemFormModalObj) itemFormModalObj.hide(); }
 
-    // ==================== FITUR LUPA PASSWORD ====================
-    function showForgotPasswordModal() {
-      document.getElementById('forgotEmail').value = '';
-      const msgDiv = document.getElementById('forgotPasswordMessage');
-      msgDiv.classList.add('d-none');
-      msgDiv.innerHTML = '';
-      if (!forgotPasswordModal) forgotPasswordModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
-      forgotPasswordModal.show();
-    }
-    
-    function copyNewPassword() {
-      const pwd = document.getElementById('newPasswordDisplay').innerText;
-      if (pwd) {
-        navigator.clipboard.writeText(pwd).then(() => {
-          const btn = document.querySelector('#showPasswordModal .copy-btn');
-          const orig = btn.innerHTML;
-          btn.innerHTML = '<i class="fas fa-check"></i> Tersalin!';
-          setTimeout(() => btn.innerHTML = orig, 2000);
-        });
-      }
-    }
-    
-    function closePasswordModalAndNavigate() {
-      if (showPasswordModal) showPasswordModal.hide();
-      navigate('login');
-    }
-    
-    async function processForgotPassword() {
-      const email = document.getElementById('forgotEmail').value.trim();
-      const msgDiv = document.getElementById('forgotPasswordMessage');
-      const sendBtn = document.getElementById('sendResetBtn');
-      
-      if (!email) {
-        showForgotMsg(msgDiv, 'danger', 'Silakan masukkan email Anda.');
-        return;
-      }
-      
-      // Cari user berdasarkan email
-      const user = getUserByEmail(email);
-      
-      if (!user) {
-        // Tampilkan pesan dengan link registrasi
-        showForgotMsg(msgDiv, 'warning', `Email "${email}" tidak ditemukan. <a href="#" class="register-link" onclick="closeForgotModalAndShowRegister('${email}')">Klik di sini untuk registrasi</a>`);
-        return;
-      }
-      
-      sendBtn.disabled = true;
-      sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
-      
-      // Generate password baru
-      const newPassword = generateRandomPassword(10);
-      
-      // Update password user
-      updateUserById(user.id, { password: newPassword });
-      console.log(`Password untuk ${user.email} telah direset menjadi: ${newPassword}`);
-      
-      // Tutup modal lupa password
-      if (forgotPasswordModal) forgotPasswordModal.hide();
-      
-      // Tampilkan modal dengan password baru
-      if (!showPasswordModal) showPasswordModal = new bootstrap.Modal(document.getElementById('showPasswordModal'));
-      document.getElementById('newPasswordDisplay').innerText = newPassword;
-      showPasswordModal.show();
-      
-      sendBtn.disabled = false;
-      sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Reset Password';
-      document.getElementById('forgotEmail').value = '';
-    }
-    
-    function closeForgotModalAndShowRegister(email) {
-      if (forgotPasswordModal) forgotPasswordModal.hide();
-      showRegisterModal();
-      if (email) document.getElementById('regEmail').value = email;
-    }
-    
-    function showForgotMsg(div, type, text) {
-      div.classList.remove('d-none', 'alert-danger', 'alert-success', 'alert-warning');
-      div.classList.add(`alert-${type}`);
-      div.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'exclamation-triangle'}"></i> ${text}`;
-    }
-
-    // ==================== FUNGSI TOGGLE PASSWORD ====================
-    function togglePasswordVisibility(inputId) {
-      const input = document.getElementById(inputId);
-      const icon = input.nextElementSibling;
-      if (input.type === 'password') { input.type = 'text'; icon.classList.replace('fa-eye', 'fa-eye-slash'); }
-      else { input.type = 'password'; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
-    }
-
-    // ==================== CRUD REQUESTS ====================
-    async function addRequest(reqData) {
-      try { await db.collection('borrow_requests').add(reqData); return true; } 
-      catch(e) { alert('Gagal ajukan: ' + e.message); return false; }
-    }
-    async function updateRequest(reqId, data) {
-      try { await db.collection('borrow_requests').doc(reqId).update(data); return true; } 
-      catch(e) { return false; }
-    }
+    // ==================== IMPORT EXCEL (LENGKAP) ====================
+    function showImportModal() { const input=document.createElement('input'); input.type='file'; input.accept='.xlsx,.xls,.csv,.txt'; input.onchange=async(e)=>{ const file=e.target.files[0]; if(!file) return; const ext=file.name.split('.').pop().toLowerCase(); const reader=new FileReader(); reader.onload=async(ev)=>{ let rows=[]; if(ext==='csv'||ext==='txt'){ Papa.parse(ev.target.result,{header:true,complete:res=>{ rows=res.data; importData(rows); }}); }else{ const workbook=XLSX.read(ev.target.result,{type:'binary'}); const sheet=workbook.Sheets[workbook.SheetNames[0]]; rows=XLSX.utils.sheet_to_json(sheet); importData(rows); } }; if(ext==='csv'||ext==='txt') reader.readAsText(file); else reader.readAsBinaryString(file); }; input.click(); }
+    async function importData(rows) { let lastValidName=''; for(let row of rows){ let name=row['NAMA']||row['Nama']||row['nama']||''; if(!name.trim()) name=lastValidName; else lastValidName=name; if(!name.trim()) continue; const type=row['TYPE']||row['Type']||row['type']||''; const lama=row['Lama']||row['lama']||''; const baru=row['Baru']||row['baru']||''; let qty=row['Qty']||row['QTY']||row['quantity']||row['Jumlah']||'0'; let quantity=0; if(typeof qty==='string'){ const match=qty.match(/\d+/); quantity=match?parseInt(match[0]):0; }else{ quantity=parseInt(qty)||0; } const status=row['STATUS']||row['Status']||row['status']||'Baik'; const catatan=row['CATATAN']||row['Catatan']||row['catatan']||''; await addItem({ name:name.trim(), category:'Umum', quantity, location:'Gudang', type, lama, baru, status, notes:catatan, image:'', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); } alert(`Import selesai.`); }
 
     // ==================== ROUTING ====================
-    function renderNav() {
-      const user = getCurrentUser();
-      const navLinks = document.getElementById('navLinks');
-      const userDisplay = document.getElementById('userDisplay');
-      if (user) {
-        userDisplay.innerText = `Halo, ${user.name} (${user.role === 'admin' ? 'Admin' : 'Peminjam'})`;
-        let links = '';
-        if (user.role === 'admin') {
-          links = `<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowRequests')">Permintaan</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('history')">Riwayat</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('manageUsers')"><i class="fas fa-users"></i> Kelola User</a></li>`;
-        } else {
-          links = `<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowForm')">Pinjam Barang</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>`;
-        }
-        links += `<li class="nav-item"><a class="nav-link" href="#" onclick="showChangePasswordModal()"><i class="fas fa-key"></i> Ganti Password</a></li>`;
-        navLinks.innerHTML = links;
-      } else {
-        userDisplay.innerText = '';
-        navLinks.innerHTML = '';
-      }
-    }
+    function renderNav() { const user=getCurrentUser(); const navLinks=document.getElementById('navLinks'); const userDisplay=document.getElementById('userDisplay'); if(user){ userDisplay.innerText=`Halo, ${user.name} (${user.role==='admin'?'Admin':'Peminjam'})`; let links=''; if(user.role==='admin'){ links=`<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowRequests')">Permintaan</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('history')">Riwayat</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('manageUsers')"><i class="fas fa-users"></i> Kelola User</a></li>`; }else{ links=`<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowForm')">Pinjam Barang</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>`; } navLinks.innerHTML=links; }else{ userDisplay.innerText=''; navLinks.innerHTML=''; } }
+    function navigate(page) { if(page==='borrowForm' && !getCurrentUser()){ alert('Harus login'); currentPage='login'; }else{ currentPage=page; } renderPage(); }
+    function renderPage() { const user=getCurrentUser(); if(!user && currentPage!=='login') currentPage='login'; const content=document.getElementById('pageContent'); if(currentPage==='login') content.innerHTML=renderLogin(); else if(currentPage==='inventory') content.innerHTML=renderInventory(); else if(currentPage==='borrowForm') content.innerHTML=renderBorrowForm(); else if(currentPage==='myBorrows') content.innerHTML=renderMyBorrows(); else if(currentPage==='borrowRequests') content.innerHTML=renderBorrowRequests(); else if(currentPage==='history') content.innerHTML=renderHistory(); else if(currentPage==='manageUsers') content.innerHTML=renderManageUsers(); renderNav(); }
+    function renderLogin() { return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control"></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control"></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div><hr><p class="text-muted text-center">Belum punya akun? Hubungi Pengurus GSM.</p></div></div></div></div>`; }
+    function doLogin() { const email=document.getElementById('loginEmail').value; const pass=document.getElementById('loginPassword').value; const user=getUsers().find(u=>u.email===email && u.password===pass); if(user){ setCurrentUser({id:user.id,name:user.name,email:user.email,role:user.role}); startItemsListener(); startRequestsListener(); navigate('inventory'); }else alert('Email atau password salah'); }
+    function logout() { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); navigate('login'); }
 
-    function navigate(page) {
-      if (page === 'borrowForm' && !getCurrentUser()) {
-        alert('Harus login terlebih dahulu');
-        currentPage = 'login';
-      } else { currentPage = page; }
-      renderPage();
-    }
-
-    function renderPage() {
-      const user = getCurrentUser();
-      if (!user && currentPage !== 'login') currentPage = 'login';
-      const content = document.getElementById('pageContent');
-      if (currentPage === 'login') content.innerHTML = renderLogin();
-      else if (currentPage === 'inventory') content.innerHTML = renderInventory();
-      else if (currentPage === 'borrowForm') content.innerHTML = renderBorrowForm();
-      else if (currentPage === 'myBorrows') content.innerHTML = renderMyBorrows();
-      else if (currentPage === 'borrowRequests') content.innerHTML = renderBorrowRequests();
-      else if (currentPage === 'history') content.innerHTML = renderHistory();
-      else if (currentPage === 'manageUsers') content.innerHTML = renderManageUsers();
-      renderNav();
-    }
-
-    // ==================== LOGIN ====================
-    function renderLogin() {
-      return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div>
-        <div class="card-body">
-          <div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control"></div>
-          <div class="mb-3"><label>Password</label><div class="password-wrapper"><input type="password" id="loginPassword" class="form-control"><i class="fas fa-eye toggle-password" onclick="togglePasswordVisibility('loginPassword')"></i></div></div>
-          <button class="btn btn-primary w-100" onclick="doLogin()">Login</button>
-          <hr>
-          <div class="text-center mb-2">
-            <span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span>
-          </div>
-          <div class="text-center">
-            <span class="register-link" onclick="showRegisterModal()"><i class="fas fa-user-plus"></i> Belum punya akun? Daftar di sini</span>
-          </div>
-        </div></div></div></div>`;
-    }
-
-    function doLogin() {
-      const email = document.getElementById('loginEmail').value;
-      const pass = document.getElementById('loginPassword').value;
-      const users = getUsers();
-      const user = users.find(u => u.email === email && u.password === pass);
-      if (user) {
-        setCurrentUser({ id: user.id, name: user.name, email: user.email, role: user.role });
-        startItemsListener();
-        startRequestsListener();
-        navigate('inventory');
-      } else {
-        alert('Email atau password salah');
-      }
-    }
-
-    function logout() {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-      if (itemsListener) itemsListener();
-      if (requestsListener) requestsListener();
-      navigate('login');
-    }
-
-    // ==================== MANAGE USERS ====================
-    function renderManageUsers() {
-      const currentUser = getCurrentUser();
-      if (!currentUser || currentUser.role !== 'admin') return '<div class="alert alert-danger">Akses ditolak.</div>';
-      const users = getAllUsers();
-      let html = `<div class="d-flex justify-content-between mb-3"><h3><i class="fas fa-users"></i> Kelola Pengguna</h3>
-        <button class="btn btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Tambah User</button></div>
-        <div class="card"><div class="card-body"><div class="table-responsive"><table class="table table-bordered"><thead><tr><th>#</th><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`;
-      users.forEach((user, idx) => {
-        const isCurrent = currentUser.id === user.id;
-        html += `<tr><td>${idx+1}</td><td><div class="d-flex align-items-center"><div class="user-avatar me-2">${user.name.charAt(0)}</div>${escapeHtml(user.name)} ${isCurrent ? '<small>(Anda)</small>' : ''}</div></td>
-          <td>${escapeHtml(user.email)}</td>
-          <td><select class="form-select form-select-sm" id="role-${user.id}" onchange="updateUserRole('${user.id}', this.value)"><option value="borrower" ${user.role === 'borrower' ? 'selected' : ''}>Peminjam</option><option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option></select></td>
-          <td><button class="btn btn-sm btn-warning me-1" onclick="editUser('${user.id}')"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deleteUser('${user.id}')" ${isCurrent ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td>
-        </tr>`;
-      });
-      html += `</tbody></table></div><div class="alert alert-info mt-3">Total: ${users.length} pengguna (${users.filter(u=>u.role==='admin').length} Admin, ${users.filter(u=>u.role==='borrower').length} Peminjam)</div></div></div>`;
-      return html;
-    }
-    
-    function updateUserRole(userId, newRole) {
-      const user = getUserById(userId);
-      if (!user) return;
-      const currentUser = getCurrentUser();
-      if (currentUser && currentUser.id === userId) {
-        if (confirm('Anda mengubah role sendiri. Anda akan logout.')) {
-          updateUserById(userId, { role: newRole });
-          setTimeout(() => logout(), 1500);
-        } else { document.getElementById(`role-${userId}`).value = user.role; }
-        return;
-      }
-      updateUserById(userId, { role: newRole });
-      alert(`Role ${user.name} diubah menjadi ${newRole === 'admin' ? 'Admin' : 'Peminjam'}`);
-    }
-    
-    function showAddUserModal() {
-      document.getElementById('userModalTitle').innerText = 'Tambah User';
-      document.getElementById('editUserId').value = '';
-      document.getElementById('userName').value = '';
-      document.getElementById('userEmail').value = '';
-      document.getElementById('userPassword').value = '';
-      document.getElementById('userRole').value = 'borrower';
-      if (!userModal) userModal = new bootstrap.Modal(document.getElementById('userModal'));
-      userModal.show();
-    }
-    
-    function editUser(userId) {
-      const user = getUserById(userId);
-      if (!user) return;
-      document.getElementById('userModalTitle').innerText = 'Edit User';
-      document.getElementById('editUserId').value = user.id;
-      document.getElementById('userName').value = user.name;
-      document.getElementById('userEmail').value = user.email;
-      document.getElementById('userPassword').value = '';
-      document.getElementById('userPassword').placeholder = 'Kosongkan jika tidak ingin ubah password';
-      document.getElementById('userRole').value = user.role;
-      if (!userModal) userModal = new bootstrap.Modal(document.getElementById('userModal'));
-      userModal.show();
-    }
-    
-    function saveUser() {
-      const userId = document.getElementById('editUserId').value;
-      const name = document.getElementById('userName').value.trim();
-      const email = document.getElementById('userEmail').value.trim();
-      const password = document.getElementById('userPassword').value;
-      const role = document.getElementById('userRole').value;
-      if (!name || !email) return alert('Nama dan email harus diisi');
-      const users = getAllUsers();
-      if (users.some(u => u.email === email && u.id !== userId)) return alert('Email sudah digunakan');
-      if (!userId) {
-        if (!password || password.length < 4) return alert('Password minimal 4 karakter');
-        addUser({ name, email, password, role });
-        alert('User ditambahkan!');
-      } else {
-        const updateData = { name, email, role };
-        if (password && password.length >= 4) updateData.password = password;
-        else if (password && password.length > 0) return alert('Password minimal 4 karakter');
-        updateUserById(userId, updateData);
-        if (getCurrentUser()?.id === userId) {
-          const updated = getUserById(userId);
-          setCurrentUser({ id: updated.id, name: updated.name, email: updated.email, role: updated.role });
-          renderNav();
-        }
-        alert('User diupdate!');
-      }
-      if (userModal) userModal.hide();
-      renderPage();
-    }
-    
-    function deleteUser(userId) {
-      const user = getUserById(userId);
-      if (!user) return;
-      if (confirm(`Hapus user "${user.name}"?`)) {
-        if (deleteUserById(userId)) { alert('User dihapus!'); renderPage(); }
-      }
-    }
-
-    // ==================== INVENTORY ====================
+    // ==================== INVENTORY DENGAN CHECKBOX & HAPUS MASSAL ====================
     function renderInventory() {
       const user = getCurrentUser();
-      if (!items.length && user) return '<div class="text-center"><div class="spinner-border"></div></div>';
-      let html = `<div class="d-flex justify-content-between mb-3"><h3>Daftar Inventory</h3><div>`;
-      if (user?.role === 'admin') html += `<button class="btn btn-primary" onclick="showAddItemModal()"><i class="fas fa-plus"></i> Tambah</button>
-        <button class="btn btn-success ms-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import</button>`;
-      html += `</div></div><div class="table-responsive"><table class="table table-bordered"><thead><tr><th>Nama</th><th>Kategori</th><th>Stok</th><th>Lokasi</th><th>Gambar</th><th>QR Code</th>${user?.role === 'admin' ? '<th>Aksi</th>' : ''}</tr></thead><tbody>`;
+      if (!items.length && user) return '<div class="text-center"><div class="spinner-border"></div> Memuat data...</div>';
+      let html = `<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                    <h3><i class="fas fa-boxes me-2"></i>Daftar Inventory</h3>
+                    <div>`;
+      if (user && user.role === 'admin') {
+        html += `<button class="btn btn-primary me-2" onclick="showAddItemModal()"><i class="fas fa-plus"></i> Tambah</button>
+                 <button class="btn btn-success me-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import Excel</button>
+                 <button class="btn btn-danger delete-selected-btn" id="deleteSelectedBtn" onclick="deleteSelectedItems()" style="display:none;"><i class="fas fa-trash-alt"></i> Hapus Terpilih</button>`;
+      }
+      html += `</div></div>
+               <div class="table-responsive">
+               <table class="table table-bordered table-hover">
+                 <thead class="table-light">
+                   <tr>
+                     <th width="40"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll()"></th>
+                     <th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Status</th><th>Catatan</th><th>Gambar</th><th>QR</th>${user && user.role === 'admin' ? '<th>Aksi</th>' : ''}
+                   </tr>
+                 </thead>
+                 <tbody>`;
       items.forEach(item => {
-        html += `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.category)}</td><td>${item.quantity}</td><td>${escapeHtml(item.location)}</td>
-        <td>${item.image ? `<img src="${item.image}" style="max-height:50px;cursor:pointer" onclick="showItemDetail('${item.id}')">` : '-'}</td>
-        <td><div class="qr-code" id="qr-${item.id}" onclick="showItemDetail('${item.id}')"></div></td>
-        ${user?.role === 'admin' ? `<td><button class="btn btn-sm btn-warning" onclick="editItem('${item.id}')"><i class="fas fa-edit"></i></button>
-        <button class="btn btn-sm btn-danger ms-1" onclick="deleteItem('${item.id}')"><i class="fas fa-trash"></i></button></td>` : ''}</tr>`;
+        html += `<tr>
+                   <td class="text-center"><input type="checkbox" class="item-checkbox" value="${item.id}" onclick="updateDeleteButtonVisibility()"></td>
+                   <td>${escapeHtml(item.name)}</td>
+                   <td>${escapeHtml(item.type || '-')}</td>
+                   <td>${escapeHtml(item.lama || '-')}</td>
+                   <td>${escapeHtml(item.baru || '-')}</td>
+                   <td>${item.quantity}</td>
+                   <td>${escapeHtml(item.status || 'Baik')}</td>
+                   <td>${escapeHtml(item.notes ? (item.notes.length>30 ? item.notes.substr(0,30)+'...' : item.notes) : '-')}</td>
+                   <td>${item.image ? `<img src="${item.image}" style="max-height:40px; cursor:pointer;" onclick="showItemDetail('${item.id}')">` : '-'}</td>
+                   <td><div class="qr-code" id="qr-${item.id}" data-url="${window.location.origin+window.location.pathname+'?item='+item.id}" onclick="showItemDetail('${item.id}')"></div></td>
+                   ${user && user.role === 'admin' ? `<td><button class="btn btn-sm btn-warning" onclick="editItem('${item.id}')"><i class="fas fa-edit"></i></button>
+                   <button class="btn btn-sm btn-danger" onclick="deleteItemConfirm('${item.id}')"><i class="fas fa-trash"></i></button></td>` : ''}
+                 </tr>`;
       });
       html += `</tbody></table></div>`;
-      setTimeout(() => items.forEach(item => {
-        const c = document.getElementById(`qr-${item.id}`);
-        if (c) new QRCode(c, { text: location.origin + location.pathname + '?item=' + item.id, width: 150, height: 150 });
-      }), 100);
+      // render QR codes after DOM ready
+      setTimeout(() => {
+        items.forEach(item => {
+          const container = document.getElementById(`qr-${item.id}`);
+          if (container) {
+            container.innerHTML = '';
+            new QRCode(container, { text: window.location.origin+window.location.pathname+'?item='+item.id, width: 100, height: 100 });
+          }
+        });
+        updateDeleteButtonVisibility(); // ensure button visibility after render
+      }, 100);
       return html;
     }
-    
-    function escapeHtml(text) { if (!text) return ''; return text.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
-    
-    function showItemDetail(id) {
-      const item = items.find(i => i.id === id);
-      if (item) displayItemDetail(item);
-      else getItemById(id).then(i => i && displayItemDetail(i));
-    }
-    
-    async function getItemById(id) {
-      try { const d = await db.collection('items').doc(id).get(); return d.exists ? { id: d.id, ...d.data() } : null; } 
-      catch(e) { return null; }
-    }
-    
-    function displayItemDetail(item) {
-      document.getElementById('itemDetailBody').innerHTML = `<div class="text-center">${item.image ? `<img src="${item.image}" class="item-image">` : '<div class="alert alert-secondary">Tidak ada gambar</div>'}</div>
-      <p><strong>Nama:</strong> ${escapeHtml(item.name)}</p><p><strong>Kategori:</strong> ${escapeHtml(item.category)}</p>
-      <p><strong>Stok:</strong> ${item.quantity}</p><p><strong>Lokasi:</strong> ${escapeHtml(item.location)}</p>`;
-      new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
-    }
-    
-    function showAddItemModal() {
-      const name = prompt('Nama Barang:'); if (!name) return;
-      const cat = prompt('Kategori:'); if (cat === null) return;
-      const qty = parseInt(prompt('Jumlah:') || '0'); if (isNaN(qty)) return;
-      const loc = prompt('Lokasi:'); if (loc === null) return;
-      uploadContext = { mode: 'add', data: { name, category: cat, quantity: qty, location: loc } };
-      if (!imageOptionModal) imageOptionModal = new bootstrap.Modal(document.getElementById('imageOptionModal'));
-      imageOptionModal.show();
-    }
-    
-    async function editItem(id) {
-      const item = items.find(i => i.id === id); if (!item) return;
-      const name = prompt('Nama:', item.name); if (name) item.name = name;
-      const cat = prompt('Kategori:', item.category); if (cat) item.category = cat;
-      const qty = parseInt(prompt('Jumlah:', item.quantity)); if (!isNaN(qty)) item.quantity = qty;
-      const loc = prompt('Lokasi:', item.location); if (loc) item.location = loc;
-      uploadContext = { mode: 'edit', data: { name: item.name, category: item.category, quantity: item.quantity, location: item.location }, itemId: id, item };
-      if (!imageOptionModal) imageOptionModal = new bootstrap.Modal(document.getElementById('imageOptionModal'));
-      imageOptionModal.show();
-    }
-    
-    function triggerFileUpload() { imageOptionModal?.hide(); document.getElementById('hiddenFileInput').click(); }
-    
-    const fileInput = document.getElementById('hiddenFileInput');
-    fileInput.onchange = async function(e) {
-      const file = e.target.files[0]; if (!file) return;
-      alert('Upload gambar...');
-      try {
-        const imgUrl = await new Promise((resolve) => {
-          const r = new FileReader();
-          r.onload = () => resolve(r.result);
-          r.readAsDataURL(file);
-        });
-        if (uploadContext.mode === 'add') await saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, imgUrl);
-        else if (uploadContext.mode === 'edit') await updateItem(uploadContext.itemId, { ...uploadContext.data, image: imgUrl });
-      } catch(err) { alert('Gagal upload'); if (uploadContext.mode === 'add') await saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, ''); }
-      fileInput.value = '';
-    };
-    
-    function submitImageUrl() {
-      const url = document.getElementById('imageUrlInput').value.trim();
-      imageOptionModal?.hide();
-      if (uploadContext.mode === 'add') saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, url);
-      else if (uploadContext.mode === 'edit') updateItem(uploadContext.itemId, { ...uploadContext.data, image: url });
-      document.getElementById('imageUrlInput').value = '';
-    }
-    
-    function skipImage() {
-      imageOptionModal?.hide();
-      if (uploadContext.mode === 'add') saveNewItem(uploadContext.data.name, uploadContext.data.category, uploadContext.data.quantity, uploadContext.data.location, '');
-      else if (uploadContext.mode === 'edit') updateItem(uploadContext.itemId, uploadContext.data);
-    }
-    
-    async function saveNewItem(name, cat, qty, loc, img) {
-      await addItem({ name, category: cat, quantity: qty, location: loc, image: img, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      alert('Barang ditambahkan!');
-    }
-    
-    async function deleteItem(id) { if (confirm('Hapus barang?')) await deleteItemById(id); }
-    
-    function showImportModal() {
-      const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls,.csv';
-      input.onchange = e => {
-        const file = e.target.files[0]; if (!file) return;
-        const r = new FileReader();
-        r.onload = async ev => {
-          let rows = [];
-          if (file.name.endsWith('.csv')) Papa.parse(ev.target.result, { header: true, complete: res => importData(res.data) });
-          else { const wb = XLSX.read(ev.target.result, { type: 'binary' }); rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); importData(rows); }
-        };
-        file.name.endsWith('.csv') ? r.readAsText(file) : r.readAsBinaryString(file);
-      };
-      input.click();
-    }
-    
-    async function importData(rows) {
-      for (const row of rows) if (row.name) await addItem({ name: row.name, category: row.category || 'Umum', quantity: parseInt(row.quantity) || 0, location: row.location || 'Gudang', image: row.image || '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      alert('Import selesai');
+
+    // Helper untuk escape HTML
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+    // Menampilkan atau menyembunyikan tombol hapus terpilih berdasarkan ada/tidaknya checkbox yang dicentang
+    function updateDeleteButtonVisibility() {
+      const checkboxes = document.querySelectorAll('.item-checkbox');
+      const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+      const deleteBtn = document.getElementById('deleteSelectedBtn');
+      if (deleteBtn) deleteBtn.style.display = anyChecked ? 'inline-block' : 'none';
     }
 
-    // ==================== PEMINJAMAN ====================
-    function renderBorrowForm() {
-      const user = getCurrentUser(); if (!user) return '<div class="alert alert-warning">Login dulu</div>';
-      return `<div class="card"><div class="card-header bg-primary text-white">Form Peminjaman</div><div class="card-body">
-        <div class="mb-3"><label>Nama Peminjam</label><input type="text" class="form-control" value="${escapeHtml(user.name)}" readonly></div>
-        <div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${items.map(i => `<option value="${i.id}">${escapeHtml(i.name)} (stok ${i.quantity})</option>`)}</select></div>
-        <div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div>
-        <div class="mb-3"><label>Tgl Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div>
-        <div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div>
-        <div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div>
-        <button class="btn btn-primary" onclick="submitBorrow()">Ajukan</button></div></div>`;
+    // Toggle select all
+    function toggleSelectAll() {
+      const selectAll = document.getElementById('selectAllCheckbox');
+      const checkboxes = document.querySelectorAll('.item-checkbox');
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+      updateDeleteButtonVisibility();
     }
-    
-    async function submitBorrow() {
-      const user = getCurrentUser(); if (!user) return;
-      const itemId = document.getElementById('borrowItem').value; if (!itemId) return;
-      const item = items.find(i => i.id === itemId);
-      const qty = parseInt(document.getElementById('borrowQty').value);
-      if (qty <= 0 || qty > item.quantity) return alert('Jumlah tidak valid');
-      await addRequest({ itemId, itemName: item.name, borrowerId: user.id, borrowerName: user.name, quantity: qty, borrowDate: document.getElementById('borrowDate').value, returnDate: document.getElementById('returnDate').value, purpose: document.getElementById('purpose').value, status: 'pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-      alert('Permintaan diajukan'); navigate('myBorrows');
-    }
-    
-    function renderMyBorrows() {
-      const user = getCurrentUser(); if (!user) return '';
-      const my = requests.filter(r => r.borrowerId === user.id);
-      if (!my.length) return '<h3>Peminjamanku</h3><p>Belum ada</p>';
-      return `<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>${my.map(r => `<tr><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td>${r.status}</td></tr>`).join('')}</tbody></table>`;
-    }
-    
-    function renderBorrowRequests() {
-      const pending = requests.filter(r => r.status === 'pending');
-      if (!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada</p>';
-      return `<h3>Permintaan Pending</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Aksi</th></tr></thead><tbody>${pending.map(r => `<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`).join('')}</tbody></table>`;
-    }
-    
-    async function approveRequest(id) {
-      const req = requests.find(r => r.id === id); if (!req) return;
-      const item = items.find(i => i.id === req.itemId);
-      if (item.quantity < req.quantity) return alert('Stok tidak cukup');
-      item.quantity -= req.quantity;
-      await updateItem(item.id, { quantity: item.quantity });
-      await updateRequest(id, { status: 'approved' });
-      alert('Disetujui');
-    }
-    
-    async function rejectRequest(id) { await updateRequest(id, { status: 'rejected' }); alert('Ditolak'); }
-    
-    function renderHistory() {
-      if (!requests.length) return '<h3>Riwayat</h3><p>Belum ada</p>';
-      return `<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>${requests.map(r => `<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td>${r.status}</td></tr>`).join('')}</tbody></table>`;
-    }
-    
-    async function handlePublicLink() {
-      const itemId = new URLSearchParams(location.search).get('item');
-      if (itemId) {
-        document.getElementById('pageContent').innerHTML = '<div class="text-center spinner-border"></div>';
-        const item = await getItemById(itemId);
-        if (item) { document.getElementById('pageContent').innerHTML = ''; setTimeout(() => displayItemDetail(item), 300); }
-        else document.getElementById('pageContent').innerHTML = '<div class="alert alert-danger">Barang tidak ditemukan</div>';
+
+    // Konfirmasi hapus satu item (tetap dipertahankan)
+    async function deleteItemConfirm(itemId) {
+      if (confirm('Hapus barang ini?')) {
+        await deleteItem(itemId);
       }
     }
-    
+
+    // Hapus semua item yang tercentang
+    async function deleteSelectedItems() {
+      const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+      if (checkboxes.length === 0) {
+        alert('Tidak ada item yang dipilih.');
+        return;
+      }
+      const confirmMsg = `Anda akan menghapus ${checkboxes.length} item. Tindakan ini tidak dapat dibatalkan. Lanjutkan?`;
+      if (!confirm(confirmMsg)) return;
+      
+      // Nonaktifkan tombol sementara
+      const deleteBtn = document.getElementById('deleteSelectedBtn');
+      if (deleteBtn) deleteBtn.disabled = true;
+      
+      let deletedCount = 0;
+      for (let cb of checkboxes) {
+        const itemId = cb.value;
+        const success = await deleteItem(itemId);
+        if (success) deletedCount++;
+      }
+      
+      if (deleteBtn) deleteBtn.disabled = false;
+      alert(`${deletedCount} item berhasil dihapus.`);
+      // Setelah hapus, render ulang (akan otomatis karena listener Firestore)
+      // Namun kita perlu memastikan checkbox selectAll tidak centang lagi
+      const selectAll = document.getElementById('selectAllCheckbox');
+      if (selectAll) selectAll.checked = false;
+      updateDeleteButtonVisibility();
+    }
+
+    // ==================== PEMINJAMAN (fungsi tetap) ====================
+    function renderBorrowForm() { const user=getCurrentUser(); if(!user) return '<div class="alert alert-warning">Login dulu</div>'; let options='<option value="">Pilih Barang</option>'; items.forEach(i=>options+=`<option value="${i.id}" data-max="${i.quantity}">${i.name} (stok ${i.quantity})</option>`); return `<div class="card"><div class="card-header bg-primary text-white">Form Peminjaman</div><div class="card-body"><div class="mb-3"><label>Nama Peminjam</label><input type="text" id="borrowerName" class="form-control" value="${user.name}" readonly></div><div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${options}</select></div><div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div><div class="mb-3"><label>Tanggal Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div><div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div><div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div><button class="btn btn-primary" onclick="submitBorrow()">Ajukan Peminjaman</button></div></div>`; }
+    async function submitBorrow() { const user=getCurrentUser(); if(!user) return; const itemId=document.getElementById('borrowItem').value; if(!itemId) return alert('Pilih barang'); const item=items.find(i=>i.id===itemId); const qty=parseInt(document.getElementById('borrowQty').value); if(qty<=0||qty>item.quantity) return alert('Jumlah tidak valid'); const borrowDate=document.getElementById('borrowDate').value; const returnDate=document.getElementById('returnDate').value; if(!borrowDate||!returnDate) return alert('Isi tanggal'); const purpose=document.getElementById('purpose').value; await db.collection('borrow_requests').add({ itemId, itemName:item.name, borrowerId:user.id, borrowerName:user.name, quantity:qty, borrowDate, returnDate, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); alert('Permintaan diajukan'); navigate('myBorrows'); }
+    function renderMyBorrows() { const user=getCurrentUser(); if(!user) return ''; const my=requests.filter(r=>r.borrowerId===user.id); if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; let html='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>'; my.forEach(r=>{ html+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':'text-warning'}">${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
+    function renderBorrowRequests() { const pending=requests.filter(r=>r.status==='pending'); if(!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada.</p>'; let html='<h3>Permintaan Pending</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody>'; pending.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`; }); html+='</tbody></table>'; return html; }
+    async function approveRequest(id) { const req=requests.find(r=>r.id===id); if(!req) return; const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ alert('Stok tidak cukup'); return; } item.quantity-=req.quantity; await updateItem(item.id,{quantity:item.quantity}); await db.collection('borrow_requests').doc(id).update({status:'approved'}); alert('Disetujui'); }
+    async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); alert('Ditolak'); }
+    function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
+    function renderManageUsers() { const currentUser=getCurrentUser(); if(!currentUser||currentUser.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; const users=getAllUsers(); let html=`<div class="d-flex justify-content-between"><h3>Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()">Tambah User</button></div><table class="table"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; users.forEach(u=>{ html+=`<tr><td>${u.name} ${currentUser.id===u.id?'(Anda)':''}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}>Hapus</button></td></tr>`; }); html+='</tbody></table>'; return html; }
+    function showAddUserModal() { openUserModal(''); }
+    function editUser(id) { openUserModal(id); }
+    function openUserModal(id) { const user=id?getUserById(id):null; document.getElementById('editUserId').value=id||''; document.getElementById('userName').value=user?user.name:''; document.getElementById('userEmail').value=user?user.email:''; document.getElementById('userPassword').value=''; document.getElementById('userRole').value=user?user.role:'borrower'; if(!window.userModal) window.userModal=new bootstrap.Modal(document.getElementById('userModal')); window.userModal.show(); }
+    function saveUser() { const userId=document.getElementById('editUserId').value; const name=document.getElementById('userName').value.trim(); const email=document.getElementById('userEmail').value.trim(); const password=document.getElementById('userPassword').value; const role=document.getElementById('userRole').value; if(!name||!email) return alert('Nama dan email harus diisi'); const users=getAllUsers(); if(users.some(u=>u.email===email && u.id!==userId)) return alert('Email sudah terdaftar'); if(!userId){ if(!password||password.length<4) return alert('Password minimal 4 karakter'); addUser({name,email,password,role}); }else{ const update={name,email,role}; if(password&&password.length>=4) update.password=password; updateUserById(userId,update); if(getCurrentUser().id===userId) setCurrentUser({...getCurrentUser(), name, email, role}); } if(window.userModal) window.userModal.hide(); renderPage(); }
+    function deleteUser(id){ if(confirm('Hapus user?')) deleteUserById(id) && renderPage(); }
+    function showItemDetail(itemId) { const item=items.find(i=>i.id===itemId); if(item) displayItemDetailModal(item); else alert('Tidak ditemukan'); }
+    function displayItemDetailModal(item) { const modalBody=document.getElementById('itemDetailBody'); modalBody.innerHTML=`<div class="text-center mb-3">${item.image?`<img src="${item.image}" class="item-image">`:'<div class="alert alert-secondary">Tidak ada gambar</div>'}</div><p><strong>Nama:</strong> ${item.name}</p><p><strong>Type:</strong> ${item.type||'-'}</p><p><strong>Lama:</strong> ${item.lama||'-'}</p><p><strong>Baru:</strong> ${item.baru||'-'}</p><p><strong>Stok:</strong> ${item.quantity}</p><p><strong>Lokasi:</strong> ${item.location||'-'}</p><p><strong>Status:</strong> ${item.status||'Baik'}</p><p><strong>Catatan:</strong> ${item.notes||'-'}</p>`; new bootstrap.Modal(document.getElementById('itemDetailModal')).show(); }
+
+    // ==================== INIT ====================
     window.onload = async () => {
-      const itemId = new URLSearchParams(location.search).get('item');
-      if (itemId) await handlePublicLink();
-      else if (getCurrentUser()) { startItemsListener(); startRequestsListener(); navigate('inventory'); }
-      else navigate('login');
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('item')) {
+        const itemId = urlParams.get('item');
+        const doc = await db.collection('items').doc(itemId).get();
+        if(doc.exists) displayItemDetailModal({id:doc.id,...doc.data()});
+        else document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Barang tidak ditemukan</div>';
+      } else {
+        if(getCurrentUser()) { startItemsListener(); startRequestsListener(); navigate('inventory'); }
+        else navigate('login');
+      }
     };
   </script>
 </body>
