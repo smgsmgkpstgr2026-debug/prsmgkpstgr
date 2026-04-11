@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Aplikasi Inventory & Peminjaman + Filter + Cetak</title>
+  <title>Aplikasi Inventory & Peminjaman + Filter + Cetak + Cetak Barcode</title>
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome Icons -->
@@ -39,6 +39,43 @@
       .qr-code { display: none; }
       body { background: white; margin: 0; padding: 0; }
       .container { width: 100%; max-width: none; padding: 0; margin: 0; }
+    }
+    /* Style untuk cetak barcode */
+    .barcode-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+    .barcode-item {
+      text-align: center;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      page-break-inside: avoid;
+    }
+    .barcode-item .qr-container {
+      width: 150px;
+      height: 150px;
+      margin: 0 auto;
+    }
+    .barcode-item .item-name {
+      font-weight: bold;
+      margin-top: 10px;
+      font-size: 14px;
+      word-break: break-word;
+    }
+    @media print {
+      .barcode-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .barcode-item {
+        border: none;
+        page-break-inside: avoid;
+      }
+      .no-print-barcode {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -327,7 +364,7 @@
     function doLogin() { const email=document.getElementById('loginEmail').value; const pass=document.getElementById('loginPassword').value; const user=getUsers().find(u=>u.email===email && u.password===pass); if(user){ setCurrentUser({id:user.id,name:user.name,email:user.email,role:user.role}); startItemsListener(); startRequestsListener(); navigate('inventory'); }else alert('Email atau password salah'); }
     function logout() { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); navigate('login'); }
 
-    // ==================== INVENTORY DENGAN FILTER, SORT, CETAK ====================
+    // ==================== INVENTORY DENGAN FILTER, SORT, CETAK, CETAK BARCODE ====================
     function getFilteredAndSortedItems() {
       let filtered = items.filter(item => item.name.toLowerCase().includes(filterName.toLowerCase()));
       filtered.sort((a, b) => {
@@ -350,9 +387,11 @@
         html += `<button class="btn btn-primary me-2" onclick="showAddItemModal()"><i class="fas fa-plus"></i> Tambah</button>
                  <button class="btn btn-success me-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import Excel</button>
                  <button class="btn btn-info me-2" onclick="printInventory()"><i class="fas fa-print"></i> Cetak</button>
+                 <button class="btn btn-secondary me-2" onclick="printBarcode()"><i class="fas fa-qrcode"></i> Cetak Barcode</button>
                  <button class="btn btn-danger delete-selected-btn" id="deleteSelectedBtn" onclick="deleteSelectedItems()" style="display:none;"><i class="fas fa-trash-alt"></i> Hapus Terpilih</button>`;
       } else {
-        html += `<button class="btn btn-info me-2" onclick="printInventory()"><i class="fas fa-print"></i> Cetak</button>`;
+        html += `<button class="btn btn-info me-2" onclick="printInventory()"><i class="fas fa-print"></i> Cetak</button>
+                 <button class="btn btn-secondary me-2" onclick="printBarcode()"><i class="fas fa-qrcode"></i> Cetak Barcode</button>`;
       }
       html += `</div></div>`;
       
@@ -480,6 +519,132 @@
       printWindow.document.write(printContent);
       printWindow.document.close();
       printWindow.print();
+    }
+
+    // Fungsi Cetak Barcode (QR Code)
+    function printBarcode() {
+      // Ambil item yang dipilih dari checkbox, jika tidak ada, gunakan semua item yang sedang tampil (filtered)
+      const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
+      let itemsToPrint = [];
+      if (selectedCheckboxes.length > 0) {
+        // Cetak berdasarkan checklist
+        const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+        itemsToPrint = items.filter(item => selectedIds.includes(item.id));
+        if (itemsToPrint.length === 0) {
+          alert('Tidak ada item yang dipilih.');
+          return;
+        }
+      } else {
+        // Cetak semua item yang tampil (setelah filter & sort)
+        itemsToPrint = getFilteredAndSortedItems();
+        if (itemsToPrint.length === 0) {
+          alert('Tidak ada data untuk dicetak.');
+          return;
+        }
+      }
+
+      // Buat konten HTML untuk cetak barcode
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Cetak Barcode Inventory</title>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+            h2 { text-align: center; margin-bottom: 20px; }
+            .barcode-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+              gap: 20px;
+              padding: 10px;
+            }
+            .barcode-item {
+              text-align: center;
+              border: 1px solid #ccc;
+              padding: 10px;
+              border-radius: 8px;
+              page-break-inside: avoid;
+              background: white;
+            }
+            .qr-container {
+              width: 150px;
+              height: 150px;
+              margin: 0 auto;
+            }
+            .item-name {
+              font-weight: bold;
+              margin-top: 10px;
+              font-size: 14px;
+              word-break: break-word;
+            }
+            @media print {
+              .barcode-grid {
+                grid-template-columns: repeat(3, 1fr);
+              }
+              .barcode-item {
+                border: none;
+                page-break-inside: avoid;
+              }
+              .no-print-barcode {
+                display: none;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print-barcode" style="text-align: center; margin-bottom: 20px;">
+            <button onclick="window.print();" style="padding: 10px 20px; font-size: 16px;">🖨️ Cetak / Simpan PDF</button>
+            <button onclick="window.close();" style="padding: 10px 20px; font-size: 16px;">❌ Tutup</button>
+          </div>
+          <h2>QR Code - Label Barang</h2>
+          <div class="barcode-grid" id="barcodeGrid"></div>
+          <script>
+            const items = ${JSON.stringify(itemsToPrint.map(item => ({ id: item.id, name: item.name })))};
+            const grid = document.getElementById('barcodeGrid');
+            const baseUrl = window.location.origin + window.location.pathname;
+            items.forEach(item => {
+              const url = baseUrl + '?item=' + item.id;
+              const div = document.createElement('div');
+              div.className = 'barcode-item';
+              div.innerHTML = \`
+                <div class="qr-container" id="qr-\${item.id}"></div>
+                <div class="item-name">\${escapeHtml(item.name)}</div>
+              \`;
+              grid.appendChild(div);
+            });
+            function escapeHtml(str) {
+              if (!str) return '';
+              return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+              });
+            }
+            // Generate QR code setelah div ditambahkan
+            setTimeout(() => {
+              items.forEach(item => {
+                const url = baseUrl + '?item=' + item.id;
+                const container = document.getElementById('qr-' + item.id);
+                if (container) {
+                  new QRCode(container, {
+                    text: url,
+                    width: 150,
+                    height: 150,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                  });
+                }
+              });
+            }, 100);
+          <\/script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
     }
 
     function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
