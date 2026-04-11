@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Aplikasi Inventory & Peminjaman + Filter + Cetak + Cetak Barcode</title>
+  <title>Aplikasi Inventory & Peminjaman + Filter + Cetak + Cetak Barcode + Hapus Duplikat + Notifikasi</title>
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome Icons -->
@@ -29,9 +29,32 @@
     .forgot-password-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
     .forgot-password-link:hover { color: #0a58ca; }
     .delete-selected-btn { margin-right: 10px; }
+    /* Toast notification */
+    .toast-notif {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #28a745;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 9999;
+      font-size: 14px;
+      font-weight: bold;
+      transition: opacity 0.3s ease;
+      opacity: 1;
+    }
+    .toast-notif.error {
+      background: #dc3545;
+    }
+    .toast-notif.warning {
+      background: #ffc107;
+      color: #000;
+    }
     /* Print styles */
     @media print {
-      .no-print, .navbar, .btn, .delete-selected-btn, .action-buttons, .filter-sort-bar, .print-hide {
+      .no-print, .navbar, .btn, .delete-selected-btn, .action-buttons, .filter-sort-bar, .print-hide, .toast-notif {
         display: none !important;
       }
       .table { width: 100%; border-collapse: collapse; }
@@ -40,7 +63,6 @@
       body { background: white; margin: 0; padding: 0; }
       .container { width: 100%; max-width: none; padding: 0; margin: 0; }
     }
-    /* Style untuk cetak barcode */
     .barcode-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -208,7 +230,7 @@
 
     // State untuk filter & sort
     let filterName = '';
-    let sortOrder = 'asc'; // 'asc' atau 'desc'
+    let sortOrder = 'asc';
 
     // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(callback) {
@@ -221,7 +243,7 @@
         if (['inventory', 'borrowForm', 'myBorrows', 'borrowRequests', 'history', 'manageUsers'].includes(currentPage)) renderPage();
       }, error => {
         console.error(error);
-        alert('Gagal sync inventory');
+        showToast('Gagal sync inventory: ' + error.message, 'error');
         isItemsLoading = false;
       });
     }
@@ -231,20 +253,32 @@
         requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (callback) callback(requests);
         if (['myBorrows', 'borrowRequests', 'history'].includes(currentPage)) renderPage();
-      }, error => { console.error(error); alert('Gagal sync peminjaman'); });
+      }, error => { console.error(error); showToast('Gagal sync peminjaman', 'error'); });
     }
 
     // ==================== CRUD ITEMS ====================
-    async function addItem(itemData) { try { await db.collection('items').add(itemData); return true; } catch(e){ alert(e.message); return false; } }
-    async function updateItem(itemId, newData) { try { await db.collection('items').doc(itemId).update(newData); return true; } catch(e){ alert(e.message); return false; } }
-    async function deleteItem(itemId) { try { await db.collection('items').doc(itemId).delete(); return true; } catch(e){ alert(e.message); return false; } }
+    async function addItem(itemData) { try { await db.collection('items').add(itemData); return true; } catch(e){ showToast(e.message, 'error'); return false; } }
+    async function updateItem(itemId, newData) { try { await db.collection('items').doc(itemId).update(newData); return true; } catch(e){ showToast(e.message, 'error'); return false; } }
+    async function deleteItem(itemId) { try { await db.collection('items').doc(itemId).delete(); return true; } catch(e){ showToast(e.message, 'error'); return false; } }
 
     // ==================== CRUD USER ====================
     function getAllUsers() { return getUsers(); }
     function addUser(userData) { const users = getUsers(); const newId = 'u' + Date.now() + Math.random().toString(36).substr(2,6); users.push({ id:newId, ...userData }); saveUsers(users); return newId; }
     function updateUserById(userId, userData) { const users = getUsers(); const idx = users.findIndex(u=>u.id===userId); if(idx!==-1){ users[idx]={...users[idx], ...userData}; saveUsers(users); return true; } return false; }
-    function deleteUserById(userId) { if(getCurrentUser()?.id===userId){ alert('Tidak bisa hapus akun sendiri'); return false; } const users = getUsers().filter(u=>u.id!==userId); if(users.length===getUsers().length) return false; saveUsers(users); return true; }
+    function deleteUserById(userId) { if(getCurrentUser()?.id===userId){ showToast('Tidak bisa hapus akun sendiri', 'warning'); return false; } const users = getUsers().filter(u=>u.id!==userId); if(users.length===getUsers().length) return false; saveUsers(users); return true; }
     function getUserById(userId) { return getUsers().find(u=>u.id===userId); }
+
+    // ==================== TOAST NOTIFICATION ====================
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast-notif ${type}`;
+      toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle')} me-2"></i>${message}`;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+      }, 4000);
+    }
 
     // ==================== LUPA PASSWORD ====================
     let forgotPasswordModal;
@@ -253,15 +287,15 @@
 
     // ==================== UPLOAD GAMBAR ====================
     function uploadImage(file) { return new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=e=>resolve(e.target.result); reader.onerror=reject; reader.readAsDataURL(file); }); }
-    function triggerFileUploadForItem() { const input=document.getElementById('hiddenFileInput'); input.onchange=async(e)=>{ const file=e.target.files[0]; if(file) try{ const base64=await uploadImage(file); document.getElementById('itemImageUrl').value=base64; alert('Gambar siap'); }catch(err){ alert('Gagal upload'); } input.value=''; }; input.click(); }
+    function triggerFileUploadForItem() { const input=document.getElementById('hiddenFileInput'); input.onchange=async(e)=>{ const file=e.target.files[0]; if(file) try{ const base64=await uploadImage(file); document.getElementById('itemImageUrl').value=base64; showToast('Gambar siap', 'success'); }catch(err){ showToast('Gagal upload', 'error'); } input.value=''; }; input.click(); }
 
     // ==================== MODAL ITEM ====================
     function showAddItemModal() { resetItemForm(); document.getElementById('editItemId').value=''; document.getElementById('itemFormTitle').innerText='Tambah Barang'; if(!itemFormModalObj) itemFormModalObj=new bootstrap.Modal(document.getElementById('itemFormModal')); itemFormModalObj.show(); }
     function editItem(id) { const item=items.find(i=>i.id===id); if(!item) return; resetItemForm(); document.getElementById('editItemId').value=item.id; document.getElementById('itemName').value=item.name||''; document.getElementById('itemCategory').value=item.category||''; document.getElementById('itemQuantity').value=item.quantity||0; document.getElementById('itemLocation').value=item.location||''; document.getElementById('itemType').value=item.type||''; document.getElementById('itemLama').value=item.lama||''; document.getElementById('itemBaru').value=item.baru||''; document.getElementById('itemStatus').value=item.status||'Baik'; document.getElementById('itemNotes').value=item.notes||''; document.getElementById('itemImageUrl').value=item.image||''; document.getElementById('itemFormTitle').innerText='Edit Barang'; if(!itemFormModalObj) itemFormModalObj=new bootstrap.Modal(document.getElementById('itemFormModal')); itemFormModalObj.show(); }
     function resetItemForm() { document.getElementById('itemName').value=''; document.getElementById('itemCategory').value=''; document.getElementById('itemQuantity').value='0'; document.getElementById('itemLocation').value=''; document.getElementById('itemType').value=''; document.getElementById('itemLama').value=''; document.getElementById('itemBaru').value=''; document.getElementById('itemStatus').value='Baik'; document.getElementById('itemNotes').value=''; document.getElementById('itemImageUrl').value=''; }
-    async function saveItemFromModal() { const id=document.getElementById('editItemId').value; const name=document.getElementById('itemName').value.trim(); if(!name){ alert('Nama wajib'); return; } const data={ name, category:document.getElementById('itemCategory').value.trim(), quantity:parseInt(document.getElementById('itemQuantity').value)||0, location:document.getElementById('itemLocation').value.trim(), type:document.getElementById('itemType').value.trim(), lama:document.getElementById('itemLama').value.trim(), baru:document.getElementById('itemBaru').value.trim(), status:document.getElementById('itemStatus').value, notes:document.getElementById('itemNotes').value.trim(), image:document.getElementById('itemImageUrl').value.trim(), updatedAt:firebase.firestore.FieldValue.serverTimestamp() }; if(!id) { data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await addItem(data); alert('Tambah berhasil'); } else { await updateItem(id,data); alert('Update berhasil'); } if(itemFormModalObj) itemFormModalObj.hide(); }
+    async function saveItemFromModal() { const id=document.getElementById('editItemId').value; const name=document.getElementById('itemName').value.trim(); if(!name){ showToast('Nama wajib', 'warning'); return; } const data={ name, category:document.getElementById('itemCategory').value.trim(), quantity:parseInt(document.getElementById('itemQuantity').value)||0, location:document.getElementById('itemLocation').value.trim(), type:document.getElementById('itemType').value.trim(), lama:document.getElementById('itemLama').value.trim(), baru:document.getElementById('itemBaru').value.trim(), status:document.getElementById('itemStatus').value, notes:document.getElementById('itemNotes').value.trim(), image:document.getElementById('itemImageUrl').value.trim(), updatedAt:firebase.firestore.FieldValue.serverTimestamp() }; if(!id) { data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await addItem(data); showToast('Tambah berhasil', 'success'); } else { await updateItem(id,data); showToast('Update berhasil', 'success'); } if(itemFormModalObj) itemFormModalObj.hide(); }
 
-    // ==================== IMPORT EXCEL (AUTO DETECT HEADER) ====================
+    // ==================== IMPORT EXCEL (DENGAN PENGECEKAN DUPLIKAT DAN NOTIFIKASI) ====================
     function showImportModal() {
       const input = document.createElement('input');
       input.type = 'file';
@@ -271,6 +305,7 @@
         if (!file) return;
         const ext = file.name.split('.').pop().toLowerCase();
         const reader = new FileReader();
+        showToast('Memproses file...', 'info');
         reader.onload = async (ev) => {
           try {
             let rows = [];
@@ -279,7 +314,7 @@
               const result = Papa.parse(ev.target.result, { header: false, skipEmptyLines: true });
               const dataArray = result.data;
               const headerRowIndex = findHeaderRow(dataArray);
-              if (headerRowIndex === -1) { alert('Tidak dapat menemukan baris header.'); return; }
+              if (headerRowIndex === -1) { showToast('Tidak dapat menemukan baris header.', 'error'); return; }
               const headers = dataArray[headerRowIndex];
               const dataRows = dataArray.slice(headerRowIndex + 1);
               rows = dataRows.map(row => { const obj = {}; headers.forEach((h, idx) => { obj[h] = row[idx] || ''; }); return obj; });
@@ -291,17 +326,17 @@
               sheetName = firstSheet;
               const sheet = workbook.Sheets[firstSheet];
               const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-              if (!rawData || rawData.length === 0) { alert('File Excel kosong.'); return; }
+              if (!rawData || rawData.length === 0) { showToast('File Excel kosong.', 'error'); return; }
               const headerRowIndex = findHeaderRow(rawData);
-              if (headerRowIndex === -1) { alert('Tidak dapat menemukan baris header.'); return; }
+              if (headerRowIndex === -1) { showToast('Tidak dapat menemukan baris header.', 'error'); return; }
               const headers = rawData[headerRowIndex];
               const dataRows = rawData.slice(headerRowIndex + 1);
               rows = dataRows.map(row => { const obj = {}; headers.forEach((h, idx) => { obj[h] = row[idx] || ''; }); return obj; });
             }
             console.log(`Import dari sheet: ${sheetName}, baris data: ${rows.length}`);
-            const result = await importData(rows);
-            alert(`Import selesai. ${result.success} berhasil, ${result.failed} gagal.`);
-          } catch (err) { alert('Error: ' + err.message); }
+            const result = await importDataWithDuplicateCheck(rows);
+            showToast(`Import selesai. ✅ ${result.success} berhasil ditambahkan, ⏭️ ${result.skipped} duplikat dilewati, ❌ ${result.failed} gagal.`, result.failed > 0 ? 'warning' : 'success');
+          } catch (err) { showToast('Error: ' + err.message, 'error'); }
         };
         if (ext === 'csv' || ext === 'txt') reader.readAsText(file, 'UTF-8');
         else reader.readAsArrayBuffer(file);
@@ -319,8 +354,8 @@
       }
       return -1;
     }
-    async function importData(rows) {
-      let lastValidName = '', successCount = 0, failedCount = 0, errors = [];
+    async function importDataWithDuplicateCheck(rows) {
+      let lastValidName = '', successCount = 0, skippedCount = 0, failedCount = 0;
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         let name = '';
@@ -348,23 +383,60 @@
         for (let key of ['CATATAN', 'Catatan', 'catatan', 'KETERANGAN']) if (row[key] !== undefined && row[key] !== null) { catatan = row[key].toString().trim(); break; }
         for (let key of ['KATEGORI', 'Kategori', 'kategori']) if (row[key] !== undefined && row[key] !== null && row[key].toString().trim() !== '') { category = row[key].toString().trim(); break; }
         for (let key of ['LOKASI', 'Lokasi', 'lokasi']) if (row[key] !== undefined && row[key] !== null && row[key].toString().trim() !== '') { location = row[key].toString().trim(); break; }
+        
+        const nameLower = name.toLowerCase();
+        const typeLower = type.toLowerCase();
+        const existing = items.find(item => 
+          item.name.toLowerCase() === nameLower && 
+          (item.type || '').toLowerCase() === typeLower
+        );
+        if (existing) {
+          skippedCount++;
+          continue;
+        }
         try {
           await db.collection('items').add({ name, category, quantity, location, type, lama, baru, status, notes: catatan, image: '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
           successCount++;
-        } catch (err) { failedCount++; errors.push({ row: i+1, error: err.message }); }
+        } catch (err) { failedCount++; }
       }
-      return { success: successCount, failed: failedCount, errors };
+      return { success: successCount, skipped: skippedCount, failed: failedCount };
+    }
+
+    // ==================== HAPUS DUPLIKAT ====================
+    async function deleteDuplicates() {
+      if (!confirm('Fungsi ini akan menghapus semua data duplikat (berdasarkan Nama dan Type yang sama persis). Hanya menyisakan 1 data per kombinasi. Lanjutkan?')) return;
+      const groups = new Map();
+      for (const item of items) {
+        const key = `${item.name.toLowerCase()}|${(item.type || '').toLowerCase()}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item.id);
+      }
+      let toDelete = [];
+      for (const [key, ids] of groups.entries()) {
+        if (ids.length > 1) {
+          const keepId = ids[0];
+          const deleteIds = ids.slice(1);
+          toDelete.push(...deleteIds);
+        }
+      }
+      if (toDelete.length === 0) { showToast('Tidak ditemukan data duplikat.', 'info'); return; }
+      if (!confirm(`Akan menghapus ${toDelete.length} item duplikat. Yakin?`)) return;
+      let deleted = 0;
+      for (const id of toDelete) {
+        if (await deleteItem(id)) deleted++;
+      }
+      showToast(`${deleted} item duplikat berhasil dihapus.`, 'success');
     }
 
     // ==================== ROUTING ====================
     function renderNav() { const user=getCurrentUser(); const navLinks=document.getElementById('navLinks'); const userDisplay=document.getElementById('userDisplay'); if(user){ userDisplay.innerText=`Halo, ${user.name} (${user.role==='admin'?'Admin':'Peminjam'})`; let links=''; if(user.role==='admin'){ links=`<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowRequests')">Permintaan</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('history')">Riwayat</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('manageUsers')"><i class="fas fa-users"></i> Kelola User</a></li>`; }else{ links=`<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowForm')">Pinjam Barang</a></li><li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>`; } navLinks.innerHTML=links; }else{ userDisplay.innerText=''; navLinks.innerHTML=''; } }
-    function navigate(page) { if(page==='borrowForm' && !getCurrentUser()){ alert('Harus login'); currentPage='login'; }else{ currentPage=page; } renderPage(); }
+    function navigate(page) { if(page==='borrowForm' && !getCurrentUser()){ showToast('Harus login', 'warning'); currentPage='login'; }else{ currentPage=page; } renderPage(); }
     function renderPage() { const user=getCurrentUser(); if(!user && currentPage!=='login') currentPage='login'; const content=document.getElementById('pageContent'); if(currentPage==='login') content.innerHTML=renderLogin(); else if(currentPage==='inventory') content.innerHTML=renderInventory(); else if(currentPage==='borrowForm') content.innerHTML=renderBorrowForm(); else if(currentPage==='myBorrows') content.innerHTML=renderMyBorrows(); else if(currentPage==='borrowRequests') content.innerHTML=renderBorrowRequests(); else if(currentPage==='history') content.innerHTML=renderHistory(); else if(currentPage==='manageUsers') content.innerHTML=renderManageUsers(); renderNav(); }
     function renderLogin() { return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control"></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control"></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div><hr><p class="text-muted text-center">Belum punya akun? Hubungi Pengurus GSM.</p></div></div></div></div>`; }
-    function doLogin() { const email=document.getElementById('loginEmail').value; const pass=document.getElementById('loginPassword').value; const user=getUsers().find(u=>u.email===email && u.password===pass); if(user){ setCurrentUser({id:user.id,name:user.name,email:user.email,role:user.role}); startItemsListener(); startRequestsListener(); navigate('inventory'); }else alert('Email atau password salah'); }
-    function logout() { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); navigate('login'); }
+    function doLogin() { const email=document.getElementById('loginEmail').value; const pass=document.getElementById('loginPassword').value; const user=getUsers().find(u=>u.email===email && u.password===pass); if(user){ setCurrentUser({id:user.id,name:user.name,email:user.email,role:user.role}); startItemsListener(); startRequestsListener(); navigate('inventory'); }else showToast('Email atau password salah', 'error'); }
+    function logout() { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); navigate('login'); showToast('Logout berhasil', 'info'); }
 
-    // ==================== INVENTORY DENGAN FILTER, SORT, CETAK, CETAK BARCODE ====================
+    // ==================== INVENTORY ====================
     function getFilteredAndSortedItems() {
       let filtered = items.filter(item => item.name.toLowerCase().includes(filterName.toLowerCase()));
       filtered.sort((a, b) => {
@@ -388,6 +460,7 @@
                  <button class="btn btn-success me-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import Excel</button>
                  <button class="btn btn-info me-2" onclick="printInventory()"><i class="fas fa-print"></i> Cetak</button>
                  <button class="btn btn-secondary me-2" onclick="printBarcode()"><i class="fas fa-qrcode"></i> Cetak Barcode</button>
+                 <button class="btn btn-warning me-2" onclick="deleteDuplicates()"><i class="fas fa-copy"></i> Hapus Duplikat</button>
                  <button class="btn btn-danger delete-selected-btn" id="deleteSelectedBtn" onclick="deleteSelectedItems()" style="display:none;"><i class="fas fa-trash-alt"></i> Hapus Terpilih</button>`;
       } else {
         html += `<button class="btn btn-info me-2" onclick="printInventory()"><i class="fas fa-print"></i> Cetak</button>
@@ -395,7 +468,6 @@
       }
       html += `</div></div>`;
       
-      // Baris filter dan sort
       html += `<div class="row mb-3 filter-sort-bar">
                 <div class="col-md-4">
                   <input type="text" class="form-control" id="filterNameInput" placeholder="Cari berdasarkan nama..." value="${escapeHtml(filterName)}" onkeyup="updateFilter()">
@@ -458,239 +530,62 @@
       return html;
     }
 
-    function updateFilter() {
-      filterName = document.getElementById('filterNameInput').value;
-      renderPage();
-    }
-    function updateSortOrder(value) {
-      sortOrder = value;
-      renderPage();
-    }
-    function resetFilterSort() {
-      filterName = '';
-      sortOrder = 'asc';
-      renderPage();
-    }
+    function updateFilter() { filterName = document.getElementById('filterNameInput').value; renderPage(); }
+    function updateSortOrder(value) { sortOrder = value; renderPage(); }
+    function resetFilterSort() { filterName = ''; sortOrder = 'asc'; renderPage(); }
 
     function printInventory() {
-      const user = getCurrentUser();
       let filteredItems = getFilteredAndSortedItems();
-      if (filteredItems.length === 0) {
-        alert('Tidak ada data untuk dicetak.');
-        return;
-      }
-      let printContent = `
-        <html>
-        <head>
-          <title>Daftar Inventory</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h2 { text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .print-footer { margin-top: 30px; text-align: center; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <h2>Daftar Inventory - ${new Date().toLocaleString()}</h2>
-          <table>
-            <thead>
-              <tr><th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Status</th><th>Catatan</th></tr>
-            </thead>
-            <tbody>`;
-      filteredItems.forEach(item => {
-        printContent += `<tr>
-          <td>${escapeHtml(item.name)}</td>
-          <td>${escapeHtml(item.type || '-')}</td>
-          <td>${escapeHtml(item.lama || '-')}</td>
-          <td>${escapeHtml(item.baru || '-')}</td>
-          <td>${item.quantity}</td>
-          <td>${escapeHtml(item.status || 'Baik')}</td>
-          <td>${escapeHtml(item.notes || '-')}</td>
-        </tr>`;
-      });
-      printContent += `</tbody>
-          </table>
-          <div class="print-footer">Dicetak dari Aplikasi Inventory & Peminjaman</div>
-        </body>
-        </html>`;
+      if (filteredItems.length === 0) { showToast('Tidak ada data untuk dicetak.', 'warning'); return; }
+      let printContent = `<html><head><title>Daftar Inventory</title><style>body{font-family:Arial;margin:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #000;padding:8px;text-align:left}th{background:#f2f2f2}</style></head><body><h2>Daftar Inventory - ${new Date().toLocaleString()}</h2></table><thead><tr><th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Status</th><th>Catatan</th></tr></thead><tbody>`;
+      filteredItems.forEach(item => { printContent += `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.type||'-')}</td><td>${escapeHtml(item.lama||'-')}</td><td>${escapeHtml(item.baru||'-')}</td><td>${item.quantity}</td><td>${escapeHtml(item.status||'Baik')}</td><td>${escapeHtml(item.notes||'-')}</td></tr>`; });
+      printContent += `</tbody></table><div class="print-footer">Dicetak dari Aplikasi Inventory</div></body></html>`;
       const printWindow = window.open('', '_blank');
       printWindow.document.write(printContent);
       printWindow.document.close();
       printWindow.print();
     }
 
-    // Fungsi Cetak Barcode (QR Code)
     function printBarcode() {
-      // Ambil item yang dipilih dari checkbox, jika tidak ada, gunakan semua item yang sedang tampil (filtered)
       const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
-      let itemsToPrint = [];
-      if (selectedCheckboxes.length > 0) {
-        // Cetak berdasarkan checklist
-        const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-        itemsToPrint = items.filter(item => selectedIds.includes(item.id));
-        if (itemsToPrint.length === 0) {
-          alert('Tidak ada item yang dipilih.');
-          return;
-        }
-      } else {
-        // Cetak semua item yang tampil (setelah filter & sort)
-        itemsToPrint = getFilteredAndSortedItems();
-        if (itemsToPrint.length === 0) {
-          alert('Tidak ada data untuk dicetak.');
-          return;
-        }
-      }
-
-      // Buat konten HTML untuk cetak barcode
+      let itemsToPrint = selectedCheckboxes.length > 0 ? items.filter(item => Array.from(selectedCheckboxes).some(cb => cb.value === item.id)) : getFilteredAndSortedItems();
+      if (itemsToPrint.length === 0) { showToast('Tidak ada item untuk dicetak.', 'warning'); return; }
       const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Cetak Barcode Inventory</title>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-            h2 { text-align: center; margin-bottom: 20px; }
-            .barcode-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-              gap: 20px;
-              padding: 10px;
-            }
-            .barcode-item {
-              text-align: center;
-              border: 1px solid #ccc;
-              padding: 10px;
-              border-radius: 8px;
-              page-break-inside: avoid;
-              background: white;
-            }
-            .qr-container {
-              width: 150px;
-              height: 150px;
-              margin: 0 auto;
-            }
-            .item-name {
-              font-weight: bold;
-              margin-top: 10px;
-              font-size: 14px;
-              word-break: break-word;
-            }
-            @media print {
-              .barcode-grid {
-                grid-template-columns: repeat(3, 1fr);
-              }
-              .barcode-item {
-                border: none;
-                page-break-inside: avoid;
-              }
-              .no-print-barcode {
-                display: none;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="no-print-barcode" style="text-align: center; margin-bottom: 20px;">
-            <button onclick="window.print();" style="padding: 10px 20px; font-size: 16px;">🖨️ Cetak / Simpan PDF</button>
-            <button onclick="window.close();" style="padding: 10px 20px; font-size: 16px;">❌ Tutup</button>
-          </div>
-          <h2>QR Code - Label Barang</h2>
-          <div class="barcode-grid" id="barcodeGrid"></div>
-          <script>
-            const items = ${JSON.stringify(itemsToPrint.map(item => ({ id: item.id, name: item.name })))};
-            const grid = document.getElementById('barcodeGrid');
-            const baseUrl = window.location.origin + window.location.pathname;
-            items.forEach(item => {
-              const url = baseUrl + '?item=' + item.id;
-              const div = document.createElement('div');
-              div.className = 'barcode-item';
-              div.innerHTML = \`
-                <div class="qr-container" id="qr-\${item.id}"></div>
-                <div class="item-name">\${escapeHtml(item.name)}</div>
-              \`;
-              grid.appendChild(div);
-            });
-            function escapeHtml(str) {
-              if (!str) return '';
-              return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-              });
-            }
-            // Generate QR code setelah div ditambahkan
-            setTimeout(() => {
-              items.forEach(item => {
-                const url = baseUrl + '?item=' + item.id;
-                const container = document.getElementById('qr-' + item.id);
-                if (container) {
-                  new QRCode(container, {
-                    text: url,
-                    width: 150,
-                    height: 150,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                  });
-                }
-              });
-            }, 100);
-          <\/script>
-        </body>
-        </html>
-      `);
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Cetak Barcode</title><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><style>.barcode-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;padding:20px}.barcode-item{text-align:center;border:1px solid #ccc;padding:10px;border-radius:8px;page-break-inside:avoid}.qr-container{width:150px;height:150px;margin:0 auto}.item-name{font-weight:bold;margin-top:10px}@media print{.barcode-grid{grid-template-columns:repeat(3,1fr)}.barcode-item{border:none}.no-print-barcode{display:none}}</style></head><body><div class="no-print-barcode" style="text-align:center;margin-bottom:20px"><button onclick="window.print()">Cetak / Simpan PDF</button> <button onclick="window.close()">Tutup</button></div><h2 style="text-align:center">QR Code - Label Barang</h2><div class="barcode-grid" id="barcodeGrid"></div><script>const items = ${JSON.stringify(itemsToPrint.map(i=>({id:i.id,name:i.name})))}; const grid=document.getElementById('barcodeGrid'); const baseUrl=window.location.origin+window.location.pathname; items.forEach(item=>{const div=document.createElement('div');div.className='barcode-item';div.innerHTML=\`<div class="qr-container" id="qr-\${item.id}"></div><div class="item-name">\${escapeHtml(item.name)}</div>\`;grid.appendChild(div);}); function escapeHtml(str){if(!str)return '';return str.replace(/[&<>]/g,function(m){if(m==='&')return '&amp;';if(m==='<')return '&lt;';if(m==='>')return '&gt;';return m;});} setTimeout(()=>{items.forEach(item=>{const url=baseUrl+'?item='+item.id;const c=document.getElementById('qr-'+item.id);if(c)new QRCode(c,{text:url,width:150,height:150});});},100);<\/script></body></html>`);
       printWindow.document.close();
     }
 
-    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
-    function updateDeleteButtonVisibility() {
-      const checkboxes = document.querySelectorAll('.item-checkbox');
-      const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-      const deleteBtn = document.getElementById('deleteSelectedBtn');
-      if (deleteBtn) deleteBtn.style.display = anyChecked ? 'inline-block' : 'none';
-    }
-    function toggleSelectAll() {
-      const selectAll = document.getElementById('selectAllCheckbox');
-      const checkboxes = document.querySelectorAll('.item-checkbox');
-      checkboxes.forEach(cb => cb.checked = selectAll.checked);
-      updateDeleteButtonVisibility();
-    }
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m] || m)); }
+    function updateDeleteButtonVisibility() { const anyChecked = document.querySelectorAll('.item-checkbox:checked').length > 0; const btn = document.getElementById('deleteSelectedBtn'); if (btn) btn.style.display = anyChecked ? 'inline-block' : 'none'; }
+    function toggleSelectAll() { const selectAll = document.getElementById('selectAllCheckbox'); const cbs = document.querySelectorAll('.item-checkbox'); cbs.forEach(cb => cb.checked = selectAll.checked); updateDeleteButtonVisibility(); }
     async function deleteItemConfirm(itemId) { if (confirm('Hapus barang ini?')) await deleteItem(itemId); }
     async function deleteSelectedItems() {
       const checkboxes = document.querySelectorAll('.item-checkbox:checked');
-      if (checkboxes.length === 0) { alert('Tidak ada item yang dipilih.'); return; }
+      if (checkboxes.length === 0) { showToast('Tidak ada item yang dipilih.', 'warning'); return; }
       if (!confirm(`Hapus ${checkboxes.length} item?`)) return;
-      const deleteBtn = document.getElementById('deleteSelectedBtn');
-      if (deleteBtn) deleteBtn.disabled = true;
-      let deletedCount = 0;
-      for (let cb of checkboxes) { if (await deleteItem(cb.value)) deletedCount++; }
-      if (deleteBtn) deleteBtn.disabled = false;
-      alert(`${deletedCount} item dihapus.`);
-      const selectAll = document.getElementById('selectAllCheckbox');
-      if (selectAll) selectAll.checked = false;
+      const btn = document.getElementById('deleteSelectedBtn'); if (btn) btn.disabled = true;
+      let deleted = 0; for (let cb of checkboxes) if (await deleteItem(cb.value)) deleted++;
+      if (btn) btn.disabled = false;
+      showToast(`${deleted} item dihapus.`, 'success');
+      const selectAll = document.getElementById('selectAllCheckbox'); if (selectAll) selectAll.checked = false;
       updateDeleteButtonVisibility();
     }
 
-    // ==================== PEMINJAMAN (tidak berubah) ====================
+    // ==================== PEMINJAMAN ====================
     function renderBorrowForm() { const user=getCurrentUser(); if(!user) return '<div class="alert alert-warning">Login dulu</div>'; let options='<option value="">Pilih Barang</option>'; items.forEach(i=>options+=`<option value="${i.id}" data-max="${i.quantity}">${i.name} (stok ${i.quantity})</option>`); return `<div class="card"><div class="card-header bg-primary text-white">Form Peminjaman</div><div class="card-body"><div class="mb-3"><label>Nama Peminjam</label><input type="text" id="borrowerName" class="form-control" value="${user.name}" readonly></div><div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${options}</select></div><div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div><div class="mb-3"><label>Tanggal Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div><div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div><div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div><button class="btn btn-primary" onclick="submitBorrow()">Ajukan Peminjaman</button></div></div>`; }
-    async function submitBorrow() { const user=getCurrentUser(); if(!user) return; const itemId=document.getElementById('borrowItem').value; if(!itemId) return alert('Pilih barang'); const item=items.find(i=>i.id===itemId); const qty=parseInt(document.getElementById('borrowQty').value); if(qty<=0||qty>item.quantity) return alert('Jumlah tidak valid'); const borrowDate=document.getElementById('borrowDate').value; const returnDate=document.getElementById('returnDate').value; if(!borrowDate||!returnDate) return alert('Isi tanggal'); const purpose=document.getElementById('purpose').value; await db.collection('borrow_requests').add({ itemId, itemName:item.name, borrowerId:user.id, borrowerName:user.name, quantity:qty, borrowDate, returnDate, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); alert('Permintaan diajukan'); navigate('myBorrows'); }
-    function renderMyBorrows() { const user=getCurrentUser(); if(!user) return ''; const my=requests.filter(r=>r.borrowerId===user.id); if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; let html='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>'; my.forEach(r=>{ html+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}<td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':'text-warning'}">${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
+    async function submitBorrow() { const user=getCurrentUser(); if(!user) return; const itemId=document.getElementById('borrowItem').value; if(!itemId) return showToast('Pilih barang', 'warning'); const item=items.find(i=>i.id===itemId); const qty=parseInt(document.getElementById('borrowQty').value); if(qty<=0||qty>item.quantity) return showToast('Jumlah tidak valid', 'warning'); const borrowDate=document.getElementById('borrowDate').value; const returnDate=document.getElementById('returnDate').value; if(!borrowDate||!returnDate) return showToast('Isi tanggal', 'warning'); const purpose=document.getElementById('purpose').value; await db.collection('borrow_requests').add({ itemId, itemName:item.name, borrowerId:user.id, borrowerName:user.name, quantity:qty, borrowDate, returnDate, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); showToast('Permintaan diajukan', 'success'); navigate('myBorrows'); }
+    function renderMyBorrows() { const user=getCurrentUser(); if(!user) return ''; const my=requests.filter(r=>r.borrowerId===user.id); if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; let html='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>'; my.forEach(r=>{ html+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':'text-warning'}">${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
     function renderBorrowRequests() { const pending=requests.filter(r=>r.status==='pending'); if(!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada.</p>'; let html='<h3>Permintaan Pending</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody>'; pending.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`; }); html+='</tbody></table>'; return html; }
-    async function approveRequest(id) { const req=requests.find(r=>r.id===id); if(!req) return; const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ alert('Stok tidak cukup'); return; } item.quantity-=req.quantity; await updateItem(item.id,{quantity:item.quantity}); await db.collection('borrow_requests').doc(id).update({status:'approved'}); alert('Disetujui'); }
-    async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); alert('Ditolak'); }
-    function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody></tr>'; return html; }
+    async function approveRequest(id) { const req=requests.find(r=>r.id===id); if(!req) return; const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ showToast('Stok tidak cukup', 'error'); return; } item.quantity-=req.quantity; await updateItem(item.id,{quantity:item.quantity}); await db.collection('borrow_requests').doc(id).update({status:'approved'}); showToast('Disetujui', 'success'); }
+    async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); showToast('Ditolak', 'info'); }
+    function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody><tr>'; return html; }
     function renderManageUsers() { const currentUser=getCurrentUser(); if(!currentUser||currentUser.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; const users=getAllUsers(); let html=`<div class="d-flex justify-content-between"><h3>Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()">Tambah User</button></div><table class="table"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; users.forEach(u=>{ html+=`<tr><td>${u.name} ${currentUser.id===u.id?'(Anda)':''}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}>Hapus</button></td></tr>`; }); html+='</tbody></table>'; return html; }
     function showAddUserModal() { openUserModal(''); }
     function editUser(id) { openUserModal(id); }
     function openUserModal(id) { const user=id?getUserById(id):null; document.getElementById('editUserId').value=id||''; document.getElementById('userName').value=user?user.name:''; document.getElementById('userEmail').value=user?user.email:''; document.getElementById('userPassword').value=''; document.getElementById('userRole').value=user?user.role:'borrower'; if(!window.userModal) window.userModal=new bootstrap.Modal(document.getElementById('userModal')); window.userModal.show(); }
-    function saveUser() { const userId=document.getElementById('editUserId').value; const name=document.getElementById('userName').value.trim(); const email=document.getElementById('userEmail').value.trim(); const password=document.getElementById('userPassword').value; const role=document.getElementById('userRole').value; if(!name||!email) return alert('Nama dan email harus diisi'); const users=getAllUsers(); if(users.some(u=>u.email===email && u.id!==userId)) return alert('Email sudah terdaftar'); if(!userId){ if(!password||password.length<4) return alert('Password minimal 4 karakter'); addUser({name,email,password,role}); }else{ const update={name,email,role}; if(password&&password.length>=4) update.password=password; updateUserById(userId,update); if(getCurrentUser().id===userId) setCurrentUser({...getCurrentUser(), name, email, role}); } if(window.userModal) window.userModal.hide(); renderPage(); }
-    function deleteUser(id){ if(confirm('Hapus user?')) deleteUserById(id) && renderPage(); }
-    function showItemDetail(itemId) { const item=items.find(i=>i.id===itemId); if(item) displayItemDetailModal(item); else alert('Tidak ditemukan'); }
+    function saveUser() { const userId=document.getElementById('editUserId').value; const name=document.getElementById('userName').value.trim(); const email=document.getElementById('userEmail').value.trim(); const password=document.getElementById('userPassword').value; const role=document.getElementById('userRole').value; if(!name||!email) return showToast('Nama dan email harus diisi', 'warning'); const users=getAllUsers(); if(users.some(u=>u.email===email && u.id!==userId)) return showToast('Email sudah terdaftar', 'error'); if(!userId){ if(!password||password.length<4) return showToast('Password minimal 4 karakter', 'warning'); addUser({name,email,password,role}); showToast('User berhasil ditambahkan', 'success'); }else{ const update={name,email,role}; if(password&&password.length>=4) update.password=password; updateUserById(userId,update); if(getCurrentUser().id===userId) setCurrentUser({...getCurrentUser(), name, email, role}); showToast('User berhasil diupdate', 'success'); } if(window.userModal) window.userModal.hide(); renderPage(); }
+    function deleteUser(id){ if(confirm('Hapus user?')) if(deleteUserById(id)){ showToast('User dihapus', 'success'); renderPage(); } }
+    function showItemDetail(itemId) { const item=items.find(i=>i.id===itemId); if(item) displayItemDetailModal(item); else showToast('Tidak ditemukan', 'error'); }
     function displayItemDetailModal(item) { const modalBody=document.getElementById('itemDetailBody'); modalBody.innerHTML=`<div class="text-center mb-3">${item.image?`<img src="${item.image}" class="item-image">`:'<div class="alert alert-secondary">Tidak ada gambar</div>'}</div><p><strong>Nama:</strong> ${item.name}</p><p><strong>Type:</strong> ${item.type||'-'}</p><p><strong>Lama:</strong> ${item.lama||'-'}</p><p><strong>Baru:</strong> ${item.baru||'-'}</p><p><strong>Stok:</strong> ${item.quantity}</p><p><strong>Lokasi:</strong> ${item.location||'-'}</p><p><strong>Status:</strong> ${item.status||'Baik'}</p><p><strong>Catatan:</strong> ${item.notes||'-'}</p>`; new bootstrap.Modal(document.getElementById('itemDetailModal')).show(); }
 
     // ==================== INIT ====================
