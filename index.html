@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-  <title>Aplikasi Inventory & Peminjaman (Sync Total) + Hapus Massal + Fix Loading</title>
+  <title>Aplikasi Inventory & Peminjaman (Sync Total) + Hapus Massal</title>
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Font Awesome Icons -->
@@ -156,15 +156,15 @@
     let requestsListener = null;
     let currentPage = 'login';
     let itemFormModalObj = null;
-    let isItemsLoading = true;  // FLAG UNTUK MENGETAHUI APAKAH LOADING PERTAMA
+    let isItemsLoading = true;
 
     // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(callback) {
       if (itemsListener) itemsListener();
-      isItemsLoading = true;  // mulai loading
+      isItemsLoading = true;
       itemsListener = db.collection('items').onSnapshot(snapshot => {
         items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        isItemsLoading = false;  // selesai loading
+        isItemsLoading = false;
         if (callback) callback(items);
         if (['inventory', 'borrowForm', 'myBorrows', 'borrowRequests', 'history', 'manageUsers'].includes(currentPage)) renderPage();
       }, error => {
@@ -221,21 +221,15 @@
     function doLogin() { const email=document.getElementById('loginEmail').value; const pass=document.getElementById('loginPassword').value; const user=getUsers().find(u=>u.email===email && u.password===pass); if(user){ setCurrentUser({id:user.id,name:user.name,email:user.email,role:user.role}); startItemsListener(); startRequestsListener(); navigate('inventory'); }else alert('Email atau password salah'); }
     function logout() { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); navigate('login'); }
 
-    // ==================== INVENTORY DENGAN PERBAIKAN LOADING ====================
+    // ==================== INVENTORY DENGAN TOMBOL YANG TEPAT ====================
     function renderInventory() {
       const user = getCurrentUser();
-      // Jika masih loading pertama kali, tampilkan spinner
+      // Jika masih loading pertama, tampilkan spinner
       if (isItemsLoading) {
         return '<div class="text-center"><div class="spinner-border"></div> Memuat data inventory...</div>';
       }
-      // Jika loading selesai dan tidak ada data
-      if (!items.length) {
-        return `<div class="alert alert-info">
-                  <i class="fas fa-info-circle"></i> Belum ada data barang. 
-                  ${user?.role === 'admin' ? 'Silakan tambah barang atau import Excel.' : 'Silakan hubungi admin untuk menambah barang.'}
-                </div>`;
-      }
-      // Tampilkan tabel seperti biasa
+      
+      // Heading dan tombol (untuk admin selalu tampil)
       let html = `<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
                     <h3><i class="fas fa-boxes me-2"></i>Daftar Inventory</h3>
                     <div>`;
@@ -244,8 +238,19 @@
                  <button class="btn btn-success me-2" onclick="showImportModal()"><i class="fas fa-file-import"></i> Import Excel</button>
                  <button class="btn btn-danger delete-selected-btn" id="deleteSelectedBtn" onclick="deleteSelectedItems()" style="display:none;"><i class="fas fa-trash-alt"></i> Hapus Terpilih</button>`;
       }
-      html += `</div></div>
-               <div class="table-responsive">
+      html += `</div></div>`;
+      
+      // Jika tidak ada data
+      if (!items.length) {
+        html += `<div class="alert alert-info">
+                  <i class="fas fa-info-circle"></i> Belum ada data barang. 
+                  ${user?.role === 'admin' ? 'Silakan tambah barang atau import Excel.' : 'Silakan hubungi admin untuk menambah barang.'}
+                </div>`;
+        return html;
+      }
+      
+      // Tabel data
+      html += `<div class="table-responsive">
                <table class="table table-bordered table-hover">
                  <thead class="table-light">
                    <tr>
@@ -268,9 +273,13 @@
                    <td><div class="qr-code" id="qr-${item.id}" data-url="${window.location.origin+window.location.pathname+'?item='+item.id}" onclick="showItemDetail('${item.id}')"></div></td>
                    ${user && user.role === 'admin' ? `<td><button class="btn btn-sm btn-warning" onclick="editItem('${item.id}')"><i class="fas fa-edit"></i></button>
                    <button class="btn btn-sm btn-danger" onclick="deleteItemConfirm('${item.id}')"><i class="fas fa-trash"></i></button></td>` : ''}
-                  </tr>`;
+                 </tr>`;
       });
-      html += `</tbody>\\n               </table>\\n             </div>`;
+      html += `</tbody>
+               </table>
+             </div>`;
+      
+      // Generate QR code setelah DOM siap
       setTimeout(() => {
         items.forEach(item => {
           const container = document.getElementById(`qr-${item.id}`);
@@ -335,15 +344,15 @@
       updateDeleteButtonVisibility();
     }
 
-    // ==================== PEMINJAMAN (tidak berubah) ====================
+    // ==================== PEMINJAMAN (semua fitur tetap) ====================
     function renderBorrowForm() { const user=getCurrentUser(); if(!user) return '<div class="alert alert-warning">Login dulu</div>'; let options='<option value="">Pilih Barang</option>'; items.forEach(i=>options+=`<option value="${i.id}" data-max="${i.quantity}">${i.name} (stok ${i.quantity})</option>`); return `<div class="card"><div class="card-header bg-primary text-white">Form Peminjaman</div><div class="card-body"><div class="mb-3"><label>Nama Peminjam</label><input type="text" id="borrowerName" class="form-control" value="${user.name}" readonly></div><div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${options}</select></div><div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div><div class="mb-3"><label>Tanggal Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div><div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div><div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div><button class="btn btn-primary" onclick="submitBorrow()">Ajukan Peminjaman</button></div></div>`; }
     async function submitBorrow() { const user=getCurrentUser(); if(!user) return; const itemId=document.getElementById('borrowItem').value; if(!itemId) return alert('Pilih barang'); const item=items.find(i=>i.id===itemId); const qty=parseInt(document.getElementById('borrowQty').value); if(qty<=0||qty>item.quantity) return alert('Jumlah tidak valid'); const borrowDate=document.getElementById('borrowDate').value; const returnDate=document.getElementById('returnDate').value; if(!borrowDate||!returnDate) return alert('Isi tanggal'); const purpose=document.getElementById('purpose').value; await db.collection('borrow_requests').add({ itemId, itemName:item.name, borrowerId:user.id, borrowerName:user.name, quantity:qty, borrowDate, returnDate, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); alert('Permintaan diajukan'); navigate('myBorrows'); }
-    function renderMyBorrows() { const user=getCurrentUser(); if(!user) return ''; const my=requests.filter(r=>r.borrowerId===user.id); if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; let html='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>'; my.forEach(r=>{ html+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':'text-warning'}">${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
+    function renderMyBorrows() { const user=getCurrentUser(); if(!user) return ''; const my=requests.filter(r=>r.borrowerId===user.id); if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; let html='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>'; my.forEach(r=>{ html+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}<td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':'text-warning'}">${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
     function renderBorrowRequests() { const pending=requests.filter(r=>r.status==='pending'); if(!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada.</p>'; let html='<h3>Permintaan Pending</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody>'; pending.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`; }); html+='</tbody></table>'; return html; }
     async function approveRequest(id) { const req=requests.find(r=>r.id===id); if(!req) return; const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ alert('Stok tidak cukup'); return; } item.quantity-=req.quantity; await updateItem(item.id,{quantity:item.quantity}); await db.collection('borrow_requests').doc(id).update({status:'approved'}); alert('Disetujui'); }
     async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); alert('Ditolak'); }
-    function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
-    function renderManageUsers() { const currentUser=getCurrentUser(); if(!currentUser||currentUser.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; const users=getAllUsers(); let html=`<div class="d-flex justify-content-between"><h3>Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()">Tambah User</button></div><table class="table"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; users.forEach(u=>{ html+=`<tr><td>${u.name} ${currentUser.id===u.id?'(Anda)':''}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}>Hapus</button></td></tr>`; }); html+='</tbody></td>'; return html; }
+    function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody></tr>'; return html; }
+    function renderManageUsers() { const currentUser=getCurrentUser(); if(!currentUser||currentUser.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; const users=getAllUsers(); let html=`<div class="d-flex justify-content-between"><h3>Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()">Tambah User</button></div><table class="table"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; users.forEach(u=>{ html+=`<tr><td>${u.name} ${currentUser.id===u.id?'(Anda)':''}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}>Hapus</button></td></tr>`; }); html+='</tbody></table>'; return html; }
     function showAddUserModal() { openUserModal(''); }
     function editUser(id) { openUserModal(id); }
     function openUserModal(id) { const user=id?getUserById(id):null; document.getElementById('editUserId').value=id||''; document.getElementById('userName').value=user?user.name:''; document.getElementById('userEmail').value=user?user.email:''; document.getElementById('userPassword').value=''; document.getElementById('userRole').value=user?user.role:'borrower'; if(!window.userModal) window.userModal=new bootstrap.Modal(document.getElementById('userModal')); window.userModal.show(); }
