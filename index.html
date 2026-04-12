@@ -579,12 +579,110 @@
     async function approveRequest(id) { const req=requests.find(r=>r.id===id); if(!req) return; const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ showToast('Stok tidak cukup', 'error'); return; } item.quantity-=req.quantity; await updateItem(item.id,{quantity:item.quantity}); await db.collection('borrow_requests').doc(id).update({status:'approved'}); showToast('Disetujui', 'success'); }
     async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); showToast('Ditolak', 'info'); }
     function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody><tr>'; return html; }
-    function renderManageUsers() { const currentUser=getCurrentUser(); if(!currentUser||currentUser.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; const users=getAllUsers(); let html=`<div class="d-flex justify-content-between"><h3>Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()">Tambah User</button></div><table class="table"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; users.forEach(u=>{ html+=`<tr><td>${u.name} ${currentUser.id===u.id?'(Anda)':''}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}>Hapus</button></td></tr>`; }); html+='</tbody></table>'; return html; }
+
+    // ==================== MANAGE USERS (DIPERBAIKI) ====================
+    function renderManageUsers() { 
+      const currentUser=getCurrentUser(); 
+      if(!currentUser||currentUser.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; 
+      const users=getAllUsers(); 
+      let html=`<div class="d-flex justify-content-between"><h3>Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()">Tambah User</button></div><table class="table"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; 
+      users.forEach(u=>{ 
+        html+=`<tr><td>${u.name} ${currentUser.id===u.id?'(Anda)':''}</td><td>${u.email}</td><td>${u.role}</td><td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}>Hapus</button></td></tr>`; 
+      }); 
+      html+='</tbody></table>'; 
+      return html; 
+    }
+
     function showAddUserModal() { openUserModal(''); }
     function editUser(id) { openUserModal(id); }
-    function openUserModal(id) { const user=id?getUserById(id):null; document.getElementById('editUserId').value=id||''; document.getElementById('userName').value=user?user.name:''; document.getElementById('userEmail').value=user?user.email:''; document.getElementById('userPassword').value=''; document.getElementById('userRole').value=user?user.role:'borrower'; if(!window.userModal) window.userModal=new bootstrap.Modal(document.getElementById('userModal')); window.userModal.show(); }
-    function saveUser() { const userId=document.getElementById('editUserId').value; const name=document.getElementById('userName').value.trim(); const email=document.getElementById('userEmail').value.trim(); const password=document.getElementById('userPassword').value; const role=document.getElementById('userRole').value; if(!name||!email) return showToast('Nama dan email harus diisi', 'warning'); const users=getAllUsers(); if(users.some(u=>u.email===email && u.id!==userId)) return showToast('Email sudah terdaftar', 'error'); if(!userId){ if(!password||password.length<4) return showToast('Password minimal 4 karakter', 'warning'); addUser({name,email,password,role}); showToast('User berhasil ditambahkan', 'success'); }else{ const update={name,email,role}; if(password&&password.length>=4) update.password=password; updateUserById(userId,update); if(getCurrentUser().id===userId) setCurrentUser({...getCurrentUser(), name, email, role}); showToast('User berhasil diupdate', 'success'); } if(window.userModal) window.userModal.hide(); renderPage(); }
-    function deleteUser(id){ if(confirm('Hapus user?')) if(deleteUserById(id)){ showToast('User dihapus', 'success'); renderPage(); } }
+
+    function openUserModal(id) {
+      const user = id ? getUserById(id) : null;
+      const isEdit = !!user;
+      
+      // Judul modal dinamis
+      document.getElementById('userModalTitle').innerText = isEdit ? 'Edit User' : 'Tambah User';
+      document.getElementById('editUserId').value = id || '';
+      document.getElementById('userName').value = user ? user.name : '';
+      document.getElementById('userEmail').value = user ? user.email : '';
+      document.getElementById('userPassword').value = '';
+      
+      const passwordInput = document.getElementById('userPassword');
+      if (isEdit) {
+        passwordInput.placeholder = 'Kosongkan jika tidak mengubah password';
+      } else {
+        passwordInput.placeholder = 'Minimal 4 karakter';
+      }
+      
+      document.getElementById('userRole').value = user ? user.role : 'borrower';
+      
+      if (!window.userModal) window.userModal = new bootstrap.Modal(document.getElementById('userModal'));
+      window.userModal.show();
+    }
+
+    function saveUser() {
+      const userId = document.getElementById('editUserId').value;
+      const name = document.getElementById('userName').value.trim();
+      const email = document.getElementById('userEmail').value.trim();
+      const password = document.getElementById('userPassword').value;
+      const role = document.getElementById('userRole').value;
+      
+      if (!name || !email) {
+        showToast('Nama dan email harus diisi', 'warning');
+        return;
+      }
+      
+      const users = getAllUsers();
+      if (users.some(u => u.email === email && u.id !== userId)) {
+        showToast('Email sudah terdaftar', 'error');
+        return;
+      }
+      
+      // Mode Tambah
+      if (!userId) {
+        if (!password || password.length < 4) {
+          showToast('Password minimal 4 karakter', 'warning');
+          return;
+        }
+        addUser({ name, email, password, role });
+        showToast('User berhasil ditambahkan', 'success');
+      } 
+      // Mode Edit
+      else {
+        const update = { name, email, role };
+        if (password) {
+          if (password.length < 4) {
+            showToast('Password minimal 4 karakter jika ingin mengubah', 'warning');
+            return;
+          }
+          update.password = password;
+        }
+        const success = updateUserById(userId, update);
+        if (!success) {
+          showToast('Gagal mengupdate user', 'error');
+          return;
+        }
+        // Update current user jika mengedit diri sendiri
+        if (getCurrentUser().id === userId) {
+          setCurrentUser({ ...getCurrentUser(), name, email, role });
+        }
+        showToast('User berhasil diupdate', 'success');
+      }
+      
+      if (window.userModal) window.userModal.hide();
+      renderPage();
+    }
+
+    function deleteUser(id) {
+      if (confirm('Hapus user?')) {
+        if (deleteUserById(id)) {
+          showToast('User dihapus', 'success');
+          renderPage();
+        }
+      }
+    }
+
+    // ==================== DETAIL BARANG ====================
     function showItemDetail(itemId) { const item=items.find(i=>i.id===itemId); if(item) displayItemDetailModal(item); else showToast('Tidak ditemukan', 'error'); }
     function displayItemDetailModal(item) { const modalBody=document.getElementById('itemDetailBody'); modalBody.innerHTML=`<div class="text-center mb-3">${item.image?`<img src="${item.image}" class="item-image">`:'<div class="alert alert-secondary">Tidak ada gambar</div>'}</div><p><strong>Nama:</strong> ${item.name}</p><p><strong>Type:</strong> ${item.type||'-'}</p><p><strong>Lama:</strong> ${item.lama||'-'}</p><p><strong>Baru:</strong> ${item.baru||'-'}</p><p><strong>Stok:</strong> ${item.quantity}</p><p><strong>Lokasi:</strong> ${item.location||'-'}</p><p><strong>Status:</strong> ${item.status||'Baik'}</p><p><strong>Catatan:</strong> ${item.notes||'-'}</p>`; new bootstrap.Modal(document.getElementById('itemDetailModal')).show(); }
 
