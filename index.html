@@ -17,7 +17,10 @@
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <!-- Firebase Authentication -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <style>
+    /* ========== CSS TIDAK BERUBAH ========== */
     body { background-color: #f8f9fa; }
     .navbar { background-color: #0d6efd; }
     .navbar-brand, .nav-link { color: white !important; }
@@ -147,14 +150,14 @@
     </div>
   </div>
 
-  <!-- Modal Lupa Password -->
+  <!-- Modal Lupa Password (Menggunakan Firebase Auth) -->
   <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header"><h5 class="modal-title"><i class="fas fa-key me-2"></i>Lupa Password</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
         <div class="modal-body">
-          <div class="alert alert-info">Masukkan email Anda, kami akan mereset password.</div>
-          <div class="mb-3"><label>Email</label><input type="email" class="form-control" id="forgotEmail"></div>
+          <div class="alert alert-info">Masukkan email Anda, kami akan mengirimkan tautan untuk mereset password.</div>
+          <div class="mb-3"><label>Email</label><input type="email" class="form-control" id="forgotEmail" placeholder="email@anda.com"></div>
           <div id="forgotPasswordMessage" class="alert d-none"></div>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" onclick="processForgotPassword()">Kirim</button></div>
@@ -179,6 +182,7 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth(); // Inisialisasi Firebase Auth
 
     // ==================== LOCAL STORAGE USERS ====================
     const STORAGE_KEYS = { USERS: 'inventory_users', CURRENT_USER: 'current_user' };
@@ -207,6 +211,7 @@
     let filterName = '';
     let sortOrder = 'asc';
     let userModalInstance = null;
+    let forgotPasswordModal = null;
 
     // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(callback) {
@@ -253,25 +258,58 @@
       setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 4000);
     }
 
-    // ==================== LUPA PASSWORD ====================
-    let forgotPasswordModal;
+    // ==================== LUPA PASSWORD (FIREBASE AUTH) ====================
     function showForgotPasswordModal() { 
-      document.getElementById('forgotEmail').value=''; 
+      document.getElementById('forgotEmail').value = ''; 
       document.getElementById('forgotPasswordMessage').classList.add('d-none'); 
-      if(!forgotPasswordModal) forgotPasswordModal=new bootstrap.Modal(document.getElementById('forgotPasswordModal')); 
+      if(!forgotPasswordModal) forgotPasswordModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal')); 
       forgotPasswordModal.show(); 
     }
-    function processForgotPassword() { 
-      const email=document.getElementById('forgotEmail').value.trim(); 
-      const msgDiv=document.getElementById('forgotPasswordMessage'); 
-      if(!email){ msgDiv.classList.remove('d-none'); msgDiv.classList.add('alert-danger'); msgDiv.innerHTML='Email harus diisi'; return; } 
-      const user=getUsers().find(u=>u.email===email); 
-      if(!user){ msgDiv.classList.remove('d-none'); msgDiv.classList.add('alert-danger'); msgDiv.innerHTML='Email tidak ditemukan'; return; } 
-      const tempPass=user.name.toLowerCase().replace(/\s/g,'')+Math.floor(Math.random()*1000); 
-      updateUserById(user.id,{password:tempPass}); 
-      msgDiv.classList.remove('d-none'); msgDiv.classList.add('alert-success'); 
-      msgDiv.innerHTML=`Password baru: <strong>${tempPass}</strong>`; 
-      setTimeout(()=>forgotPasswordModal?.hide(),4000); 
+
+    async function processForgotPassword() { 
+      const email = document.getElementById('forgotEmail').value.trim(); 
+      const msgDiv = document.getElementById('forgotPasswordMessage');
+      
+      if (!email) {
+        msgDiv.classList.remove('d-none');
+        msgDiv.classList.add('alert-danger');
+        msgDiv.innerHTML = 'Email harus diisi';
+        return;
+      }
+
+      // Tampilkan loading
+      msgDiv.classList.remove('d-none');
+      msgDiv.classList.add('alert-info');
+      msgDiv.innerHTML = 'Mengirim email reset password...';
+
+      try {
+        // Kirim email reset password via Firebase Auth
+        await auth.sendPasswordResetEmail(email);
+        
+        // Sukses
+        msgDiv.classList.remove('alert-info', 'alert-danger');
+        msgDiv.classList.add('alert-success');
+        msgDiv.innerHTML = '✅ Email reset password telah dikirim. Silakan cek inbox (dan spam) Anda.';
+        
+        setTimeout(() => {
+          forgotPasswordModal?.hide();
+          msgDiv.classList.add('d-none');
+        }, 5000);
+        
+      } catch (error) {
+        console.error('Gagal mengirim email reset password:', error);
+        msgDiv.classList.remove('alert-info');
+        msgDiv.classList.add('alert-danger');
+        
+        // Berikan pesan error yang lebih ramah
+        if (error.code === 'auth/user-not-found') {
+          msgDiv.innerHTML = '❌ Email tidak terdaftar.';
+        } else if (error.code === 'auth/invalid-email') {
+          msgDiv.innerHTML = '❌ Format email tidak valid.';
+        } else {
+          msgDiv.innerHTML = '❌ Gagal mengirim email. Pastikan email terdaftar di Firebase Authentication.';
+        }
+      }
     }
 
     // ==================== UPLOAD GAMBAR ====================
@@ -572,7 +610,7 @@
     async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); showToast('Ditolak', 'info'); }
     function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
 
-    // ==================== MANAGE USERS (DIPERBAIKI) ====================
+    // ==================== MANAGE USERS ====================
     function renderManageUsers() {
       const currentUser = getCurrentUser();
       if (!currentUser || currentUser.role !== 'admin') return '<div class="alert alert-danger">Akses ditolak</div>';
