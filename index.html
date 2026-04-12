@@ -150,7 +150,7 @@
     </div>
   </div>
 
-  <!-- Modal Lupa Password (Menggunakan Firebase Auth) -->
+  <!-- Modal Lupa Password (Firebase Auth) -->
   <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -182,36 +182,26 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const auth = firebase.auth(); // Inisialisasi Firebase Auth
-
-    // ==================== LOCAL STORAGE USERS ====================
-    const STORAGE_KEYS = { USERS: 'inventory_users', CURRENT_USER: 'current_user' };
-    function initLocalData() {
-      if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([
-          { id: 'u1', name: 'Admin', email: 'admin@inv.com', password: 'admin', role: 'admin' },
-          { id: 'u2', name: 'Borrower', email: 'user@inv.com', password: 'user', role: 'borrower' }
-        ]));
-      }
-    }
-    initLocalData();
-    function getUsers() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)); }
-    function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
-    function setCurrentUser(user) { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)); }
-    function saveUsers(users) { localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users)); }
+    const auth = firebase.auth();
 
     // ==================== GLOBAL ====================
     let items = [];
     let requests = [];
+    let users = [];            // Data user dari Firestore (tersinkronisasi)
     let itemsListener = null;
     let requestsListener = null;
+    let usersListener = null;  // Listener untuk koleksi users
     let currentPage = 'login';
     let itemFormModalObj = null;
     let isItemsLoading = true;
+    let isUsersLoading = true;
     let filterName = '';
     let sortOrder = 'asc';
     let userModalInstance = null;
     let forgotPasswordModal = null;
+
+    // Kunci localStorage untuk sesi login
+    const STORAGE_KEYS = { CURRENT_USER: 'current_user' };
 
     // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(callback) {
@@ -228,6 +218,7 @@
         isItemsLoading = false;
       });
     }
+
     function startRequestsListener(callback) {
       if (requestsListener) requestsListener();
       requestsListener = db.collection('borrow_requests').onSnapshot(snapshot => {
@@ -237,17 +228,115 @@
       }, error => { console.error(error); showToast('Gagal sync peminjaman', 'error'); });
     }
 
+    function startUsersListener(callback) {
+      if (usersListener) usersListener();
+      isUsersLoading = true;
+      usersListener = db.collection('users').onSnapshot(async snapshot => {
+        users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        isUsersLoading = false;
+        
+        // Jika koleksi kosong, buat user default
+        if (users.length === 0) {
+          await createDefaultUsers();
+        }
+        
+        if (callback) callback(users);
+        if (currentPage === 'manageUsers') renderPage();
+      }, error => {
+        console.error(error);
+        showToast('Gagal sync data user: ' + error.message, 'error');
+        isUsersLoading = false;
+      });
+    }
+
+    // Fungsi untuk membuat user default jika koleksi kosong
+    async function createDefaultUsers() {
+      try {
+        const batch = db.batch();
+        const adminRef = db.collection('users').doc();
+        const userRef = db.collection('users').doc();
+        
+        batch.set(adminRef, {
+          name: 'Admin',
+          email: 'admin@inv.com',
+          password: 'admin',
+          role: 'admin',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        batch.set(userRef, {
+          name: 'Borrower',
+          email: 'user@inv.com',
+          password: 'user',
+          role: 'borrower',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        await batch.commit();
+        console.log('Default users created in Firestore');
+      } catch (e) {
+        console.error('Gagal membuat user default:', e);
+      }
+    }
+
     // ==================== CRUD ITEMS ====================
     async function addItem(itemData) { try { await db.collection('items').add(itemData); return true; } catch(e){ showToast(e.message, 'error'); return false; } }
     async function updateItem(itemId, newData) { try { await db.collection('items').doc(itemId).update(newData); return true; } catch(e){ showToast(e.message, 'error'); return false; } }
     async function deleteItem(itemId) { try { await db.collection('items').doc(itemId).delete(); return true; } catch(e){ showToast(e.message, 'error'); return false; } }
 
-    // ==================== CRUD USER ====================
-    function getAllUsers() { return getUsers(); }
-    function addUser(userData) { const users = getUsers(); const newId = 'u' + Date.now() + Math.random().toString(36).substr(2,6); users.push({ id:newId, ...userData }); saveUsers(users); return newId; }
-    function updateUserById(userId, userData) { const users = getUsers(); const idx = users.findIndex(u=>u.id===userId); if(idx!==-1){ users[idx]={...users[idx], ...userData}; saveUsers(users); return true; } return false; }
-    function deleteUserById(userId) { if(getCurrentUser()?.id===userId){ showToast('Tidak bisa hapus akun sendiri', 'warning'); return false; } const users = getUsers().filter(u=>u.id!==userId); if(users.length===getUsers().length) return false; saveUsers(users); return true; }
-    function getUserById(userId) { return getUsers().find(u=>u.id===userId); }
+    // ==================== CRUD USER (FIRESTORE) ====================
+    function getAllUsers() { return users; }
+    function getUserById(userId) { return users.find(u => u.id === userId); }
+    
+    async function addUser(userData) {
+      try {
+        await db.collection('users').add({
+          ...userData,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return true;
+      } catch (e) {
+        showToast(e.message, 'error');
+        return false;
+      }
+    }
+    
+    async function updateUserById(userId, userData) {
+      try {
+        // Jangan update field createdAt
+        const { createdAt, ...updateData } = userData;
+        await db.collection('users').doc(userId).update(updateData);
+        return true;
+      } catch (e) {
+        showToast(e.message, 'error');
+        return false;
+      }
+    }
+    
+    async function deleteUserById(userId) {
+      const currentUser = getCurrentUser();
+      if (currentUser?.id === userId) {
+        showToast('Tidak bisa hapus akun sendiri', 'warning');
+        return false;
+      }
+      try {
+        await db.collection('users').doc(userId).delete();
+        return true;
+      } catch (e) {
+        showToast(e.message, 'error');
+        return false;
+      }
+    }
+
+    // ==================== SESSION MANAGEMENT ====================
+    function getCurrentUser() { 
+      const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      return saved ? JSON.parse(saved) : null;
+    }
+    
+    function setCurrentUser(user) { 
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user)); 
+    }
 
     // ==================== TOAST NOTIFICATION ====================
     function showToast(message, type = 'success') {
@@ -277,31 +366,23 @@
         return;
       }
 
-      // Tampilkan loading
       msgDiv.classList.remove('d-none');
       msgDiv.classList.add('alert-info');
       msgDiv.innerHTML = 'Mengirim email reset password...';
 
       try {
-        // Kirim email reset password via Firebase Auth
         await auth.sendPasswordResetEmail(email);
-        
-        // Sukses
         msgDiv.classList.remove('alert-info', 'alert-danger');
         msgDiv.classList.add('alert-success');
         msgDiv.innerHTML = '✅ Email reset password telah dikirim. Silakan cek inbox (dan spam) Anda.';
-        
         setTimeout(() => {
           forgotPasswordModal?.hide();
           msgDiv.classList.add('d-none');
         }, 5000);
-        
       } catch (error) {
-        console.error('Gagal mengirim email reset password:', error);
+        console.error(error);
         msgDiv.classList.remove('alert-info');
         msgDiv.classList.add('alert-danger');
-        
-        // Berikan pesan error yang lebih ramah
         if (error.code === 'auth/user-not-found') {
           msgDiv.innerHTML = '❌ Email tidak terdaftar.';
         } else if (error.code === 'auth/invalid-email') {
@@ -444,45 +525,52 @@
 
     // ==================== ROUTING ====================
     function renderNav() { 
-      const user=getCurrentUser(); 
-      const navLinks=document.getElementById('navLinks'); 
-      const userDisplay=document.getElementById('userDisplay'); 
-      if(user){ 
-        userDisplay.innerText=`Halo, ${user.name} (${user.role==='admin'?'Admin':'Peminjam'})`; 
-        let links=''; 
-        if(user.role==='admin'){ 
-          links=`<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li>
+      const user = getCurrentUser(); 
+      const navLinks = document.getElementById('navLinks'); 
+      const userDisplay = document.getElementById('userDisplay'); 
+      if (user) { 
+        userDisplay.innerText = `Halo, ${user.name} (${user.role === 'admin' ? 'Admin' : 'Peminjam'})`; 
+        let links = ''; 
+        if (user.role === 'admin') { 
+          links = `<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Inventory</a></li>
                  <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowRequests')">Permintaan</a></li>
                  <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('history')">Riwayat</a></li>
                  <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('manageUsers')"><i class="fas fa-users"></i> Kelola User</a></li>`; 
         } else { 
-          links=`<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li>
+          links = `<li class="nav-item"><a class="nav-link" href="#" onclick="navigate('inventory')">Lihat Barang</a></li>
                  <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('borrowForm')">Pinjam Barang</a></li>
                  <li class="nav-item"><a class="nav-link" href="#" onclick="navigate('myBorrows')">Peminjamanku</a></li>`; 
         } 
-        navLinks.innerHTML=links; 
+        navLinks.innerHTML = links; 
       } else { 
-        userDisplay.innerText=''; navLinks.innerHTML=''; 
+        userDisplay.innerText = ''; navLinks.innerHTML = ''; 
       } 
     }
+    
     function navigate(page) { 
-      if(page==='borrowForm' && !getCurrentUser()){ showToast('Harus login', 'warning'); currentPage='login'; } 
-      else { currentPage=page; } 
+      if (page === 'borrowForm' && !getCurrentUser()) { 
+        showToast('Harus login', 'warning'); 
+        currentPage = 'login'; 
+      } else { 
+        currentPage = page; 
+      } 
       renderPage(); 
     }
+    
     function renderPage() { 
-      const user=getCurrentUser(); 
-      if(!user && currentPage!=='login') currentPage='login'; 
-      const content=document.getElementById('pageContent'); 
-      if(currentPage==='login') content.innerHTML=renderLogin(); 
-      else if(currentPage==='inventory') content.innerHTML=renderInventory(); 
-      else if(currentPage==='borrowForm') content.innerHTML=renderBorrowForm(); 
-      else if(currentPage==='myBorrows') content.innerHTML=renderMyBorrows(); 
-      else if(currentPage==='borrowRequests') content.innerHTML=renderBorrowRequests(); 
-      else if(currentPage==='history') content.innerHTML=renderHistory(); 
-      else if(currentPage==='manageUsers') content.innerHTML=renderManageUsers(); 
+      const user = getCurrentUser(); 
+      if (!user && currentPage !== 'login') currentPage = 'login'; 
+      const content = document.getElementById('pageContent'); 
+      if (currentPage === 'login') content.innerHTML = renderLogin(); 
+      else if (currentPage === 'inventory') content.innerHTML = renderInventory(); 
+      else if (currentPage === 'borrowForm') content.innerHTML = renderBorrowForm(); 
+      else if (currentPage === 'myBorrows') content.innerHTML = renderMyBorrows(); 
+      else if (currentPage === 'borrowRequests') content.innerHTML = renderBorrowRequests(); 
+      else if (currentPage === 'history') content.innerHTML = renderHistory(); 
+      else if (currentPage === 'manageUsers') content.innerHTML = renderManageUsers(); 
       renderNav(); 
     }
+    
     function renderLogin() { 
       return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div>
       <div class="card-body">
@@ -493,12 +581,15 @@
         <hr><p class="text-muted text-center">Belum punya akun? Hubungi Pengurus GSM.</p>
       </div></div></div></div>`; 
     }
-    function doLogin() { 
-      const email=document.getElementById('loginEmail').value.trim(); 
-      const pass=document.getElementById('loginPassword').value; 
-      const user=getUsers().find(u=>u.email===email && u.password===pass); 
-      if(user){ 
-        setCurrentUser({id:user.id,name:user.name,email:user.email,role:user.role}); 
+    
+    async function doLogin() { 
+      const email = document.getElementById('loginEmail').value.trim(); 
+      const pass = document.getElementById('loginPassword').value; 
+      
+      // Cari user di data Firestore (users array)
+      const user = users.find(u => u.email === email && u.password === pass); 
+      if (user) { 
+        setCurrentUser({ id: user.id, name: user.name, email: user.email, role: user.role }); 
         startItemsListener(); 
         startRequestsListener(); 
         navigate('inventory'); 
@@ -506,10 +597,11 @@
         showToast('Email atau password salah', 'error'); 
       } 
     }
+    
     function logout() { 
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); 
-      if(itemsListener) itemsListener(); 
-      if(requestsListener) requestsListener(); 
+      if (itemsListener) itemsListener(); 
+      if (requestsListener) requestsListener(); 
       navigate('login'); 
       showToast('Logout berhasil', 'info'); 
     }
@@ -610,23 +702,26 @@
     async function rejectRequest(id) { await db.collection('borrow_requests').doc(id).update({status:'rejected'}); showToast('Ditolak', 'info'); }
     function renderHistory() { if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; let html='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th></tr></thead><tbody>'; requests.forEach(r=>{ html+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.status}</td></tr>`; }); html+='</tbody></table>'; return html; }
 
-    // ==================== MANAGE USERS ====================
+    // ==================== MANAGE USERS (DENGAN DATA FIRESTORE) ====================
     function renderManageUsers() {
       const currentUser = getCurrentUser();
       if (!currentUser || currentUser.role !== 'admin') return '<div class="alert alert-danger">Akses ditolak</div>';
-      const users = getAllUsers();
+      if (isUsersLoading) return '<div class="text-center"><div class="spinner-border"></div> Memuat data user...</div>';
+      
       let html = `<div class="d-flex justify-content-between mb-3"><h3><i class="fas fa-users"></i> Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Tambah User</button></div>
                   <table class="table table-bordered"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`;
       users.forEach(u => {
-        html += `<tr><td>${escapeHtml(u.name)} ${currentUser.id===u.id?'<span class="badge bg-info">Anda</span>':''}</td><td>${escapeHtml(u.email)}</td><td>${u.role==='admin'?'Admin':'Peminjam'}</td>
+        html += `<tr><td>${escapeHtml(u.name)} ${currentUser.id === u.id ? '<span class="badge bg-info">Anda</span>' : ''}</td><td>${escapeHtml(u.email)}</td><td>${u.role === 'admin' ? 'Admin' : 'Peminjam'}</td>
                  <td><button class="btn btn-sm btn-warning" onclick="editUser('${u.id}')"><i class="fas fa-edit"></i></button>
-                 <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id===u.id?'disabled':''}><i class="fas fa-trash"></i></button></td></tr>`;
+                 <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" ${currentUser.id === u.id ? 'disabled' : ''}><i class="fas fa-trash"></i></button></td></tr>`;
       });
       html += `</tbody></table>`;
       return html;
     }
+    
     function showAddUserModal() { openUserModal(null); }
     function editUser(id) { openUserModal(getUserById(id)); }
+    
     function openUserModal(user) {
       const isEdit = !!user;
       document.getElementById('userModalTitle').innerText = isEdit ? 'Edit User' : 'Tambah User';
@@ -641,35 +736,49 @@
       userModalInstance = new bootstrap.Modal(modalEl, { backdrop: 'static' });
       userModalInstance.show();
     }
-    function saveUser() {
+    
+    async function saveUser() {
       const userId = document.getElementById('editUserId').value;
       const name = document.getElementById('userName').value.trim();
       const email = document.getElementById('userEmail').value.trim();
       const password = document.getElementById('userPassword').value;
       const role = document.getElementById('userRole').value;
+      
       if (!name || !email) { showToast('Nama dan email harus diisi', 'warning'); return; }
-      const users = getAllUsers();
-      if (users.some(u => u.email === email && u.id !== userId)) { showToast('Email sudah digunakan', 'error'); return; }
+      
+      // Cek duplikat email
+      const existing = users.find(u => u.email === email && u.id !== userId);
+      if (existing) { showToast('Email sudah digunakan', 'error'); return; }
+      
       if (!userId) {
         if (!password || password.length < 4) { showToast('Password minimal 4 karakter', 'warning'); return; }
-        addUser({ name, email, password, role });
-        showToast('User berhasil ditambahkan', 'success');
+        const success = await addUser({ name, email, password, role });
+        if (success) showToast('User berhasil ditambahkan', 'success');
       } else {
         const update = { name, email, role };
         if (password) {
           if (password.length < 4) { showToast('Password minimal 4 karakter', 'warning'); return; }
           update.password = password;
         }
-        if (!updateUserById(userId, update)) { showToast('Gagal update', 'error'); return; }
-        if (getCurrentUser().id === userId) setCurrentUser({ ...getCurrentUser(), name, email, role });
-        showToast('User diupdate', 'success');
+        const success = await updateUserById(userId, update);
+        if (success) {
+          // Jika user yang sedang login mengedit dirinya sendiri, perbarui data sesi
+          const currentUser = getCurrentUser();
+          if (currentUser && currentUser.id === userId) {
+            setCurrentUser({ ...currentUser, name, email, role });
+          }
+          showToast('User diupdate', 'success');
+        }
       }
+      
       userModalInstance.hide();
-      renderPage();
+      // renderPage akan dipanggil otomatis oleh listener Firestore
     }
-    function deleteUser(id) {
+    
+    async function deleteUser(id) {
       if (!confirm('Hapus user?')) return;
-      if (deleteUserById(id)) { showToast('User dihapus', 'success'); renderPage(); }
+      const success = await deleteUserById(id);
+      if (success) showToast('User dihapus', 'success');
       else showToast('Gagal hapus', 'error');
     }
 
@@ -687,6 +796,10 @@
     window.onload = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const itemId = urlParams.get('item');
+      
+      // Mulai listener users terlebih dahulu
+      startUsersListener();
+      
       if (itemId) {
         try {
           const doc = await db.collection('items').doc(itemId).get();
@@ -694,8 +807,15 @@
           else document.getElementById('pageContent').innerHTML = '<div class="alert alert-danger">Barang tidak ditemukan</div>';
         } catch (e) { document.getElementById('pageContent').innerHTML = '<div class="alert alert-danger">Error memuat data</div>'; }
       } else {
-        if (getCurrentUser()) { startItemsListener(); startRequestsListener(); navigate('inventory'); }
-        else navigate('login');
+        const savedUser = getCurrentUser();
+        if (savedUser) {
+          // Verifikasi user masih ada di Firestore (opsional)
+          startItemsListener();
+          startRequestsListener();
+          navigate('inventory');
+        } else {
+          navigate('login');
+        }
       }
     };
   </script>
