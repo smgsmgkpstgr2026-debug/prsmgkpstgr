@@ -20,7 +20,7 @@
   <!-- Firebase Authentication -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <style>
-    /* CSS tetap sama seperti sebelumnya (tidak diubah) */
+    /* CSS TIDAK BERUBAH */
     body { background-color: #f8f9fa; }
     .navbar { background-color: #0d6efd; }
     .navbar-brand, .nav-link { color: white !important; }
@@ -78,7 +78,7 @@
     <div id="pageContent"></div>
   </div>
 
-  <!-- Modals (tidak ada perubahan) -->
+  <!-- Modals (tidak berubah) -->
   <div class="modal fade" id="itemDetailModal" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Detail Barang</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="itemDetailBody">...</div></div></div>
   </div>
@@ -143,7 +143,6 @@
     let isItemsLoading = true, isUsersLoading = true;
     let filterName = '', sortOrder = 'asc';
     const STORAGE_KEYS = { CURRENT_USER: 'current_user' };
-    // Flag untuk menandai apakah QR code sudah di-generate untuk item saat ini
     let qrGeneratedForItems = new Set();
 
     // ==================== FIRESTORE LISTENERS ====================
@@ -153,10 +152,9 @@
       itemsListener = db.collection('items').onSnapshot(snap => {
         items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         isItemsLoading = false;
-        qrGeneratedForItems.clear(); // Reset QR flag karena data berubah
+        qrGeneratedForItems.clear();
         if (cb) cb(items);
         if (currentPage === 'inventory') {
-          // Jika sedang di halaman inventory, perbarui tabel saja (jangan render ulang seluruh halaman)
           if (document.getElementById('inventoryTableBody')) {
             updateInventoryTableBody();
           } else {
@@ -380,7 +378,7 @@
     async function doLogin() { const email=document.getElementById('loginEmail').value.trim(), pass=document.getElementById('loginPassword').value; const u=users.find(x=>x.email===email&&x.password===pass); if(u){ setCurrentUser({id:u.id,name:u.name,email:u.email,role:u.role}); startItemsListener(); startRequestsListener(); navigate('inventory'); } else showToast('Email/password salah','error'); }
     function logout() { localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); navigate('login'); showToast('Logout berhasil','info'); }
 
-    // ==================== INVENTORY (DENGAN UPDATE TABEL EFISIEN) ====================
+    // ==================== INVENTORY (PERBAIKAN QR CODE) ====================
     function getFilteredAndSortedItems() {
       let filtered = items;
       if (filterName.trim()) {
@@ -394,7 +392,6 @@
       return filtered;
     }
 
-    // Fungsi untuk memperbarui hanya isi tbody tabel inventory
     function updateInventoryTableBody() {
       const tbody = document.getElementById('inventoryTableBody');
       if (!tbody) return;
@@ -418,23 +415,31 @@
       });
       tbody.innerHTML = html;
       
-      // Generate QR code hanya untuk item yang belum pernah di-generate
-      filtered.forEach(it => {
-        const container = document.getElementById(`qr-${it.id}`);
-        if (container && !qrGeneratedForItems.has(it.id)) {
-          container.innerHTML = '';
-          new QRCode(container, { text: window.location.origin+window.location.pathname+'?item='+it.id, width: 100, height: 100 });
-          qrGeneratedForItems.add(it.id);
-        }
-      });
-      
-      updateDeleteButtonVisibility();
-      // Update select all checkbox state
-      const selectAll = document.getElementById('selectAllCheckbox');
-      if (selectAll) selectAll.checked = false;
+      // **PERBAIKAN**: Gunakan setTimeout untuk memastikan DOM sudah siap, lalu generate QR code untuk semua item yang terlihat
+      setTimeout(() => {
+        filtered.forEach(it => {
+          const container = document.getElementById(`qr-${it.id}`);
+          if (container) {
+            // Bersihkan container sebelum membuat QR code baru (agar tidak menumpuk)
+            container.innerHTML = '';
+            try {
+              new QRCode(container, {
+                text: window.location.origin + window.location.pathname + '?item=' + it.id,
+                width: 100,
+                height: 100
+              });
+              qrGeneratedForItems.add(it.id);
+            } catch (e) {
+              console.warn('QR generation failed for', it.id, e);
+            }
+          }
+        });
+        updateDeleteButtonVisibility();
+        const selectAll = document.getElementById('selectAllCheckbox');
+        if (selectAll) selectAll.checked = false;
+      }, 30); // delay kecil untuk memastikan DOM update
     }
 
-    // Fungsi yang dipanggil saat input filter berubah (real-time)
     function updateFilter() {
       filterName = document.getElementById('filterNameInput')?.value || '';
       updateInventoryTableBody();
@@ -459,7 +464,6 @@
       const user = getCurrentUser(); 
       if (isItemsLoading) return '<div class="text-center"><div class="spinner-border"></div> Memuat data...</div>';
       
-      // Reset QR generated flag ketika render ulang halaman (misal setelah navigasi)
       qrGeneratedForItems.clear();
       
       let html = `<div class="d-flex justify-content-between align-items-center mb-3"><h3><i class="fas fa-boxes me-2"></i>Daftar Inventory</h3><div class="action-buttons">`;
@@ -498,14 +502,12 @@
                  <tbody id="inventoryTableBody"></tbody></table></div>`;
       }
       
-      // Render struktur, lalu isi tabel via fungsi update
       setTimeout(() => {
         updateInventoryTableBody();
       }, 20);
       return html;
     }
 
-    // Fungsi cetak dan lainnya tetap menggunakan getFilteredAndSortedItems
     function printInventory() { 
       let filtered = getFilteredAndSortedItems(); 
       if(!filtered.length){ showToast('Tidak ada data','warning'); return; } 
