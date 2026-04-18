@@ -74,6 +74,16 @@
     </div>
   </nav>
 
+  <!-- ===== TAMBAHAN: Informasi Sekolah Minggu GKPS Tangerang ===== -->
+  <div class="container-fluid bg-light py-2 border-bottom border-primary border-2">
+    <div class="container text-center">
+      <h5 class="mb-0 text-primary fw-bold">
+        <i class="fas fa-church me-2"></i>Sekolah Minggu GKPS Tangerang
+      </h5>
+    </div>
+  </div>
+  <!-- ===== AKHIR TAMBAHAN ===== -->
+
   <div class="container mt-4" id="app">
     <div id="pageContent"></div>
   </div>
@@ -558,7 +568,23 @@
 
     // ==================== DETAIL ====================
     function showItemDetail(id) { const it=items.find(i=>i.id===id); if(it) displayItemDetailModal(it); else showToast('Tidak ditemukan','error'); }
-    function displayItemDetailModal(it) { document.getElementById('itemDetailBody').innerHTML=`<div class="text-center mb-3">${it.image?`<img src="${it.image}" class="item-image">`:'<div class="alert alert-secondary">Tidak ada gambar</div>'}</div><p><strong>Nama:</strong> ${it.name}</p><p><strong>Type:</strong> ${it.type||'-'}</p><p><strong>Lama:</strong> ${it.lama||'-'}</p><p><strong>Baru:</strong> ${it.baru||'-'}</p><p><strong>Stok:</strong> ${it.quantity}</p><p><strong>Lokasi:</strong> ${it.location||'-'}</p><p><strong>Status:</strong> ${it.status||'Baik'}</p><p><strong>Catatan:</strong> ${it.notes||'-'}</p>`; new bootstrap.Modal(document.getElementById('itemDetailModal')).show(); }
+    function displayItemDetailModal(it) {
+      document.getElementById('itemDetailBody').innerHTML = `
+        <div class="text-center mb-3">
+          ${it.image ? `<img src="${it.image}" class="item-image">` : '<div class="alert alert-secondary">Tidak ada gambar</div>'}
+        </div>
+        <h6 class="text-center text-primary fw-bold mb-3"><i class="fas fa-tag me-2"></i>Asset Sekolah Minggu GKPS Tangerang</h6>
+        <p><strong>Nama:</strong> ${escapeHtml(it.name)}</p>
+        <p><strong>Type:</strong> ${escapeHtml(it.type||'-')}</p>
+        <p><strong>Lama:</strong> ${escapeHtml(it.lama||'-')}</p>
+        <p><strong>Baru:</strong> ${escapeHtml(it.baru||'-')}</p>
+        <p><strong>Stok:</strong> ${it.quantity}</p>
+        <p><strong>Lokasi:</strong> ${escapeHtml(it.location||'-')}</p>
+        <p><strong>Status:</strong> ${escapeHtml(it.status||'Baik')}</p>
+        <p><strong>Catatan:</strong> ${escapeHtml(it.notes||'-')}</p>
+      `;
+      new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
+    }
 
     // ==================== INIT ====================
     window.onload = async () => {
