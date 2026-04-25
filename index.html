@@ -465,7 +465,6 @@
       renderNav(); 
     }
 
-    // ===== MODIFIKASI: HAPUS TEKS DEMO & GANTI VALUE DENGAN PLACEHOLDER =====
     function renderLogin() { 
       return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control" placeholder="contoh: test@inv.com" value=""></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control" placeholder="contoh: test2026" value=""></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div></div></div></div></div>`; 
     }
@@ -609,12 +608,91 @@
       return html;
     }
 
-    function printInventory() { 
-      let filtered = getFilteredAndSortedItems(); 
-      if(!filtered.length){ showToast('Tidak ada data','warning'); return; } 
-      let c='<html><head><title>Inventory</title><style>body{font-family:Arial;margin:20px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #000;padding:8px}</style></head><body><h2>Daftar Inventory</h2><tr><thead><tr><th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Status</th><th>Catatan</th></tr></thead><tbody>'; 
-      filtered.forEach(i=>c+=`<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.type||'-')}</td><td>${escapeHtml(i.lama||'-')}</td><td>${escapeHtml(i.baru||'-')}</td><td>${i.quantity}</td><td>${escapeHtml(i.status||'Baik')}</td><td>${escapeHtml(i.notes||'-')}</td></tr>`); 
-      c+='</tbody></table></body></html>'; const w=window.open('','_blank'); w.document.write(c); w.document.close(); w.print(); 
+    // ===== FUNGSI CETAK INVENTORY (DIPERBAIKI) =====
+    function printInventory() {
+      // Ambil semua checkbox yang dicentang
+      const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
+      if (selectedCheckboxes.length === 0) {
+        showToast('Pilih minimal satu item dengan mencentang kotak di sebelah kiri', 'warning');
+        return;
+      }
+
+      const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+      const selectedItems = items.filter(i => selectedIds.includes(i.id));
+
+      if (selectedItems.length === 0) {
+        showToast('Item yang dipilih tidak ditemukan', 'error');
+        return;
+      }
+
+      // Urutkan berdasarkan nama
+      selectedItems.sort((a, b) => a.name.localeCompare(b.name));
+
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Cetak Inventory</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; color: #000; }
+    h2 { text-align: center; margin-bottom: 5px; }
+    .subtitle { text-align: center; font-size: 13px; color: #555; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th, td { border: 1px solid #000; padding: 6px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #555; }
+    @media print {
+      .no-print { display: none; }
+      body { margin: 0; }
+      table { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <h2>Daftar Inventory</h2>
+  <div class="subtitle">Sekolah Minggu GKPS Tangerang</div>
+  <div class="no-print" style="text-align:center; margin-bottom:15px;">
+    <button onclick="window.print()" style="padding:8px 16px; font-size:14px;">Cetak Sekarang</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nama</th>
+        <th>Type</th>
+        <th>Lama</th>
+        <th>Baru</th>
+        <th>Stok</th>
+        <th>Lokasi</th>
+        <th>Status</th>
+        <th>Catatan</th>
+      </tr>
+    </thead>
+    <tbody>
+`);
+
+      selectedItems.forEach(it => {
+        printWindow.document.write(`<tr>
+          <td>${escapeHtml(it.name)}</td>
+          <td>${escapeHtml(it.type || '-')}</td>
+          <td>${escapeHtml(it.lama || '-')}</td>
+          <td>${escapeHtml(it.baru || '-')}</td>
+          <td>${it.quantity}</td>
+          <td>${escapeHtml(it.location || '-')}</td>
+          <td>${escapeHtml(it.status || 'Baik')}</td>
+          <td>${escapeHtml(it.notes || '-')}</td>
+        </tr>`);
+      });
+
+      printWindow.document.write(`</tbody></table>
+  <div class="footer">Dicetak pada: ${new Date().toLocaleString('id-ID')}</div>
+</body>
+</html>`);
+      printWindow.document.close();
+
+      // Buka dialog cetak setelah konten siap
+      setTimeout(() => {
+        printWindow.print();
+      }, 300);
     }
     
     function printBarcode() { 
@@ -834,27 +912,19 @@
 
     // ==================== PWA - INSTALL PROMPT ====================
     window.addEventListener('beforeinstallprompt', (e) => {
-      // Mencegah prompt otomatis
       e.preventDefault();
-      // Simpan event
       deferredPrompt = e;
-      // Tampilkan tombol install
       const installBtn = document.getElementById('pwaInstallBtn');
       installBtn.classList.add('show');
       console.log('beforeinstallprompt fired, tombol install ditampilkan');
     });
 
-    // Fungsi install PWA (dipanggil saat klik tombol)
     function installPWA() {
       if (!deferredPrompt) {
         showToast('Fitur install belum tersedia. Pastikan menggunakan HTTPS dan browser mendukung PWA.', 'warning');
         return;
       }
-      
-      // Tampilkan prompt install
       deferredPrompt.prompt();
-      
-      // Tunggu hasil
       deferredPrompt.userChoice.then((choiceResult) => {
         if (choiceResult.outcome === 'accepted') {
           console.log('User menerima install');
@@ -862,21 +932,17 @@
         } else {
           console.log('User menolak install');
         }
-        // Reset deferredPrompt
         deferredPrompt = null;
-        // Sembunyikan tombol
         document.getElementById('pwaInstallBtn').classList.remove('show');
       });
     }
 
-    // Deteksi jika aplikasi sudah berjalan dalam mode standalone (sudah diinstall)
     window.addEventListener('appinstalled', () => {
       console.log('PWA berhasil diinstall');
       document.getElementById('pwaInstallBtn').classList.remove('show');
       deferredPrompt = null;
     });
 
-    // Cek jika sudah diinstall
     if (window.matchMedia('(display-mode: standalone)').matches) {
       console.log('Aplikasi berjalan dalam mode standalone');
       document.getElementById('pwaInstallBtn').classList.remove('show');
