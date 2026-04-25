@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
   <title>Aplikasi Inventory & Peminjaman + Filter + Cetak + Cetak Barcode + Hapus Duplikat + Notifikasi</title>
   
-  <!-- ====== PWA META TAGS (WAJIB) ====== -->
+  <!-- ====== PWA META TAGS (WAJIB & DIPERBAIKI) ====== -->
   <meta name="theme-color" content="#0d6efd">
+  <!-- Apple meta tags yang sudah tidak deprecated -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Inv GSM">
@@ -72,7 +74,7 @@
     
     /* Tombol Install & Buka */
     #pwaInstallBtn, #pwaOpenBtn {
-      display: none;
+      display: none !important;
       margin-right: 10px;
     }
     #pwaInstallBtn.show, #pwaOpenBtn.show {
@@ -825,30 +827,44 @@
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
     }
 
-    // ==================== PWA - SERVICE WORKER + AUTO UPDATE ====================
+    // ==================== PWA - SERVICE WORKER + AUTO UPDATE (DIPERBAIKI) ====================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
           .then(registration => {
-            console.log('ServiceWorker terdaftar: ', registration.scope);
+            console.log('ServiceWorker terdaftar dengan scope:', registration.scope);
             
-            // Cek update service worker
+            // Cek apakah ada update yang menunggu
+            if (registration.waiting) {
+              // Ada service worker baru yang menunggu, langsung suruh skip waiting
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+            
+            // Deteksi update baru
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // New content available, show toast & auto reload
-                  showToast('Update tersedia, memuat ulang...', 'info');
-                  setTimeout(() => window.location.reload(), 1500);
-                }
-              });
+              console.log('Update service worker ditemukan...');
+              
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  console.log('Service worker state:', newWorker.state);
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // Versi baru sudah siap, langsung minta skip waiting
+                    showToast('Pembaruan aplikasi tersedia...', 'info');
+                    newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              }
             });
           })
-          .catch(err => console.log('ServiceWorker gagal: ', err));
+          .catch(err => {
+            console.log('ServiceWorker gagal didaftarkan:', err);
+          });
         
-        // Jika service worker baru mengambil alih, reload halaman
+        // Dengarkan ketika service worker controller berubah (update diterapkan)
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('Controller berubah, memuat ulang...');
           if (!refreshing) {
             refreshing = true;
             window.location.reload();
@@ -857,25 +873,64 @@
       });
     }
 
-    // ==================== PWA - INSTALL PROMPT ====================
+    // ==================== PWA - INSTALL & OPEN LOGIC (DIPERBAIKI) ====================
+    // Deteksi apakah berjalan di mode standalone (sudah diinstall)
+    function isStandalone() {
+      return window.matchMedia('(display-mode: standalone)').matches || 
+             window.navigator.standalone || 
+             document.referrer.includes('android-app://');
+    }
+
+    // Update visibilitas tombol Install / Buka
+    function updatePWATombolState() {
+      const installBtn = document.getElementById('pwaInstallBtn');
+      const openBtn = document.getElementById('pwaOpenBtn');
+      
+      if (isStandalone()) {
+        // Sudah dijalankan dalam mode standalone (terpasang)
+        installBtn.classList.remove('show');
+        openBtn.classList.add('show');
+        console.log('Mode standalone - menampilkan tombol Buka Aplikasi');
+      } else {
+        // Belum terpasang
+        openBtn.classList.remove('show');
+        if (deferredPrompt) {
+          installBtn.classList.add('show');
+          console.log('beforeinstallprompt tersedia - menampilkan tombol Install');
+        } else {
+          installBtn.classList.remove('show');
+          console.log('beforeinstallprompt tidak tersedia - menyembunyikan tombol Install');
+        }
+      }
+    }
+
+    // Tangkap event beforeinstallprompt
     window.addEventListener('beforeinstallprompt', (e) => {
+      console.log('beforeinstallprompt event tertangkap!');
+      // Cegah banner native muncul otomatis
       e.preventDefault();
+      // Simpan event untuk digunakan nanti
       deferredPrompt = e;
-      // Tampilkan tombol install, sembunyikan tombol buka
-      document.getElementById('pwaInstallBtn').classList.add('show');
-      document.getElementById('pwaOpenBtn').classList.remove('show');
+      // Update tombol
+      updatePWATombolState();
     });
 
+    // Fungsi install PWA (dipanggil saat klik tombol Install)
     function installPWA() {
+      console.log('Tombol Install diklik');
       if (!deferredPrompt) {
-        showToast('Fitur install belum tersedia. Pastikan menggunakan HTTPS dan browser mendukung PWA.', 'warning');
+        showToast('Fitur install belum tersedia. Coba buka dari browser Chrome/Edge.', 'warning');
         return;
       }
+      
+      // Tampilkan prompt install
       deferredPrompt.prompt();
+      
+      // Tunggu hasil
       deferredPrompt.userChoice.then((choiceResult) => {
         if (choiceResult.outcome === 'accepted') {
-          console.log('User menerima install');
-          showToast('Aplikasi berhasil diinstall!', 'success');
+          console.log('User menerima install PWA');
+          showToast('Aplikasi berhasil diinstall! 🎉', 'success');
         } else {
           console.log('User menolak install');
         }
@@ -884,46 +939,36 @@
       });
     }
 
-    // Tombol untuk membuka aplikasi yang sudah terpasang (membuka di jendela baru agar OS menawarkan aplikasi PWA)
+    // Fungsi untuk membuka PWA yang sudah terpasang
     function openPWA() {
-      window.open(window.location.href, '_blank', 'noopener');
-    }
-
-    // Perbarui visibilitas tombol Install / Buka berdasarkan status PWA
-    function updatePWATombolState() {
-      const installBtn = document.getElementById('pwaInstallBtn');
-      const openBtn = document.getElementById('pwaOpenBtn');
-      
-      if (window.matchMedia('(display-mode: standalone)').matches) {
-        // Sudah dijalankan dalam mode standalone (terpasang)
-        installBtn.classList.remove('show');
-        openBtn.classList.add('show');
+      // Jika sudah di standalone, buka jendela baru untuk memicu aplikasi
+      if (isStandalone()) {
+        showToast('Anda sudah berada di aplikasi', 'info');
       } else {
-        // Belum terpasang, jika deferredPrompt ada tampilkan install, jika tidak sembunyikan keduanya
-        if (deferredPrompt) {
-          installBtn.classList.add('show');
-          openBtn.classList.remove('show');
-        } else {
-          installBtn.classList.remove('show');
-          openBtn.classList.remove('show');
-        }
+        // Coba buka dengan protokol khusus atau fallback ke current URL
+        window.open(window.location.href, '_blank', 'noopener,noreferrer');
+        showToast('Membuka aplikasi...', 'info');
       }
     }
 
+    // Deteksi setelah install berhasil
     window.addEventListener('appinstalled', () => {
-      console.log('PWA berhasil diinstall');
+      console.log('PWA berhasil diinstall - event appinstalled');
       deferredPrompt = null;
       updatePWATombolState();
     });
 
-    // Cek status awal
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      document.getElementById('pwaInstallBtn').classList.remove('show');
-      document.getElementById('pwaOpenBtn').classList.add('show');
-    }
+    // Panggil updatePWATombolState saat halaman dimuat
+    document.addEventListener('DOMContentLoaded', () => {
+      // Tunggu sebentar untuk memastikan deferredPrompt sudah di-set jika ada
+      setTimeout(updatePWATombolState, 1000);
+    });
 
     // ==================== INIT ====================
     window.onload = async () => {
+      // Update status tombol PWA
+      updatePWATombolState();
+      
       const params = new URLSearchParams(window.location.search), itemId = params.get('item');
       startUsersListener();
       
