@@ -1,31 +1,20 @@
-const CACHE_NAME = 'inv-gsm-v1';
-const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.json'
-];
+const CACHE_NAME = 'inventory-v1'; // Ganti versi setiap kali ada perubahan untuk memicu update
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
-  );
+  console.log('[SW] Install');
+  // Langsung aktif tanpa menunggu tab lama ditutup
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
-      );
-    })
+  console.log('[SW] Activate');
+  // Ambil alih semua halaman yang sudah terbuka
+  event.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', event => {
+  // Strategi: network first, fallback ke cache (jika diperlukan)
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });
