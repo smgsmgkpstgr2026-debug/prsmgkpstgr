@@ -19,6 +19,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <!-- Firebase Authentication -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+  <!-- ====== PWA META & MANIFEST ====== -->
+  <meta name="theme-color" content="#0d6efd">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Inv&Pinjam GSM">
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMTkyIDE5MiI+PHJlY3Qgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiIGZpbGw9IiMwZDZlZmQiLz48dGV4dCB4PSI5NiIgeT0iMTIwIiBmb250LXNpemU9IjEwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCI+STwvdGV4dD48L3N2Zz4=">
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkludmVudG9yeSAmIFBlbWluamFtYW4gR1NNIiwKICAic2hvcnRfbmFtZSI6ICJJbnZHU00iLAogICJzdGFydF91cmwiOiAiLyIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIsCiAgInRoZW1lX2NvbG9yIjogIiMwZDZlZmQiLAogICJpY29ucyI6IFsKICAgIHsKICAgICAgInNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSGRwWkhSb1BTSXhPVElpSUdobGFXZG9kRDBpTVRreUlpQjJhV1YzUW04OUlqQWdNQ0F4T1RJZ01Ua3lJajQ4Y21WamRIVnlaRDFpWVd4bklHVnVNRHduYzJWeWRtbGpaWE1nVUdGeVpYQmtJR1poYVd4bElHbHVaeUJ0YjJSbElHRndjM1JwYldVZ2FIUjBjRG92TDNkM2R5NTNNeTV2Y21jdk1UTXVNQzh3THpBdlpXUnBkR1ZrYVhScGIyNHVjM1J5WlhNZ01UVXVNQzh3THpBdlpXUnBkR1ZrYVhScGIyNHZibTl1WlM5VGRXSnNhV05wYm1jdlRtRnRaU0JLWVhObFJtRnBiR1V0Vkc5dGNDQlNaWE4wYVhKbFFtVmtaWEp6WlhJZ1FuVnBkR2xoYm1jdFJHVmpiR0Z5WldSRGIzSnBlVzFvWlNBbklqcDdJbU5zYjNWd1pEMGlSVFpOVlNJc0lDSnpiMlowZDJGeVpXUWlPaUFpYm05dVpXUWlmWHNnSW5OamNtVmxjQ0k2SUNKb2RIUndjem92TDNkM2R5NTNNeTV2Y21jdk1UTXVNQzh3THpBdklqc2dJbVY0Y0dseVpYTnpJanA3SW5SeVlXbHVkSE1pT2lBaVkyeHZkVzFrSWl3Z0luUnlZV2x1ZEY5aGJpSTZJQ0ppYjI5dUlpQjhJSHRwYm5SeVpYTnpYMmxrSWlJNlptbGxiR1Z5TENBaWRIbHdaU0k2SUNKMGNuVmxJanNLUGlVeE1EQTVNREF3UENVeFBUazVNREF3UEMxek9FODdMejVqYkdGemVEd3ZjM1puUGdvOEwzTjJaejQ5Ij4KICAgIH0sCiAgICB7CiAgICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCNGJXeHVjejBpYUhSMGNEb3ZMM2QzZHk1M015NXZjbWN2TWpBd01DOXpkbWNpSUhkcFpIUm9QU0l4T1RJaUlHaGxhV2RvZEQwaU1Ua3lJaUIyYVdWM1FtODlJakFnTUNBeE9USWdNVGt5SWo0OGNtVmpkWFZ5WkQxaVlXeG5JR1Z1TUR3bmMyVnlkbWxqWlhNZ1VHRnlaWEJrSUdaaGFXeGxJR2x1WnlCdGIyUmxJR0Z3YzNScGJXVWdhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNVEl1TUM4d0x6QXZaV1JwZEdWa2FYUnBiMjR1YzNSeVpYTWdNVEl1TUM4d0x6QXZaV1JwZEdWa2FYUnBiMjR2Ym05dVpTOVRkV0pzYVdOcGJtY3ZUbUZ0WlNCS1lYTmxSbUZwYkdVdFZHOXRjQ0JTWlhOMGFYSnRRbVZrWlhKelpYSWdRblZwZEdsaGJtY3RSR1ZqYkdGeVpXUkRiM0pwZVcxb1pTQW5JanA3SW1Oc2IzVndaQ0k4TDNOMlp6ND0iLAogICAgICAic2l6ZXMiOiAiNTEyeDUxMiIsCiAgICAgICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiCiAgICB9CiAgXQp9">
+
   <style>
     /* CSS TIDAK BERUBAH */
     body { background-color: #f8f9fa; }
@@ -57,6 +66,7 @@
     }
     .image-preview-container { margin-top: 10px; text-align: center; }
     .image-preview { max-width: 100%; max-height: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 5px; background: #f8f9fa; }
+    #pwaInstallBtn { display: none; }
   </style>
 </head>
 <body>
@@ -69,6 +79,9 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto" id="navLinks"></ul>
         <span class="navbar-text text-white me-3" id="userDisplay"></span>
+        <button class="btn btn-light btn-sm me-2" id="pwaInstallBtn" onclick="installPWA()" title="Install aplikasi ini">
+          <i class="fas fa-download"></i> Install
+        </button>
         <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -154,6 +167,7 @@
     let filterName = '', sortOrder = 'asc';
     const STORAGE_KEYS = { CURRENT_USER: 'current_user' };
     let qrGeneratedForItems = new Set();
+    let deferredPrompt = null; // untuk PWA install
 
     // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(cb) {
@@ -791,10 +805,115 @@
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
     }
 
+    // ==================== PWA INSTALL ====================
+    function initPWA() {
+      // Tombol install (di navbar)
+      const installBtn = document.getElementById('pwaInstallBtn');
+      
+      // Cek apakah service worker sudah terdaftar
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => {
+            console.log('Service Worker terdaftar', reg);
+            // Setelah service worker aktif, beberapa browser akan menampilkan beforeinstallprompt
+            
+            // Dengarkan event beforeinstallprompt
+            window.addEventListener('beforeinstallprompt', (e) => {
+              e.preventDefault();
+              deferredPrompt = e;
+              installBtn.style.display = 'inline-block';
+            });
+            
+            // Jika aplikasi sudah diinstal (display-mode standalone)
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+              installBtn.style.display = 'none';
+            }
+          })
+          .catch(err => {
+            console.warn('Gagal mendaftarkan Service Worker:', err);
+            // Jika sw.js tidak ditemukan, beri tahu pengguna cara mengunduhnya
+            installBtn.style.display = 'inline-block';
+            installBtn.title = 'Klik untuk mengunduh file service worker (sw.js) lalu muat ulang';
+          });
+      } else {
+        console.log('Service Worker tidak didukung');
+      }
+      
+      // Fungsi klik tombol install
+      window.installPWA = function() {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(choice => {
+            if (choice.outcome === 'accepted') {
+              console.log('User installed PWA');
+            }
+            deferredPrompt = null;
+          });
+        } else {
+          // Jika belum ada prompt, mungkin karena sw.js belum ada
+          // Tawarkan untuk mengunduh sw.js
+          if (confirm('Untuk menginstal, diperlukan file service worker (sw.js). Unduh sekarang?')) {
+            downloadSW();
+          }
+        }
+      };
+      
+      // Fungsi untuk mengunduh sw.js
+      function downloadSW() {
+        const swContent = `
+// Service Worker untuk PWA - Inventaris GSM
+const CACHE_NAME = 'inv-gsm-v1';
+const urlsToCache = [
+  '/',
+  '/index.html'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+      );
+    })
+  );
+});
+        `.trim();
+        
+        const blob = new Blob([swContent], { type: 'text/javascript' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'sw.js';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showToast('Silakan simpan file sw.js di folder yang sama dengan aplikasi, lalu muat ulang halaman.', 'info');
+      }
+    }
+
     // ==================== INIT ====================
     window.onload = async () => {
       const params = new URLSearchParams(window.location.search), itemId = params.get('item');
       startUsersListener();
+      initPWA(); // Inisialisasi PWA
+      
       if (itemId) {
         try { const doc = await db.collection('items').doc(itemId).get(); if(doc.exists) displayItemDetailModal({id:doc.id,...doc.data()}); else document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Barang tidak ditemukan</div>'; } catch(e) { document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Error</div>'; }
       } else {
