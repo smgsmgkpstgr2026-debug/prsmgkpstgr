@@ -1,8 +1,8 @@
-// Service Worker untuk PWA - Inventaris GSM
 const CACHE_NAME = 'inv-gsm-v1';
 const urlsToCache = [
-  '/',
-  '/index.html'
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {
