@@ -70,12 +70,12 @@
     .image-preview-container { margin-top: 10px; text-align: center; }
     .image-preview { max-width: 100%; max-height: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 5px; background: #f8f9fa; }
     
-    /* Tombol Install */
-    #pwaInstallBtn {
+    /* Tombol Install & Buka */
+    #pwaInstallBtn, #pwaOpenBtn {
       display: none;
       margin-right: 10px;
     }
-    #pwaInstallBtn.show {
+    #pwaInstallBtn.show, #pwaOpenBtn.show {
       display: inline-block !important;
     }
   </style>
@@ -90,8 +90,13 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto" id="navLinks"></ul>
         <span class="navbar-text text-white me-3" id="userDisplay"></span>
+        <!-- Tombol install (muncul sebelum terpasang) -->
         <button class="btn btn-light btn-sm" id="pwaInstallBtn" onclick="installPWA()">
           <i class="fas fa-download"></i> Install Aplikasi
+        </button>
+        <!-- Tombol buka aplikasi (muncul setelah terpasang) -->
+        <button class="btn btn-outline-light btn-sm" id="pwaOpenBtn" onclick="openPWA()">
+          <i class="fas fa-external-link-alt"></i> Buka Aplikasi
         </button>
         <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
       </div>
@@ -222,11 +227,9 @@
       }, err => { console.error(err); showToast('Gagal sync user', 'error'); isUsersLoading = false; });
     }
 
-    // ===== MODIFIKASI: GANTI KREDENSIAL ADMIN DEFAULT =====
     async function createDefaultUsers() {
       try {
         const batch = db.batch();
-        // Admin baru: test@inv.com / test2026
         batch.set(db.collection('users').doc(), { name:'Admin', email:'test@inv.com', password:'test2026', role:'admin', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         batch.set(db.collection('users').doc(), { name:'Editor', email:'editor@inv.com', password:'editor', role:'editor', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         batch.set(db.collection('users').doc(), { name:'Borrower', email:'user@inv.com', password:'user', role:'borrower', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
@@ -610,24 +613,18 @@
 
     // ===== FUNGSI CETAK INVENTORY (DIPERBAIKI) =====
     function printInventory() {
-      // Ambil semua checkbox yang dicentang
       const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
       if (selectedCheckboxes.length === 0) {
         showToast('Pilih minimal satu item dengan mencentang kotak di sebelah kiri', 'warning');
         return;
       }
-
       const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
       const selectedItems = items.filter(i => selectedIds.includes(i.id));
-
       if (selectedItems.length === 0) {
         showToast('Item yang dipilih tidak ditemukan', 'error');
         return;
       }
-
-      // Urutkan berdasarkan nama
       selectedItems.sort((a, b) => a.name.localeCompare(b.name));
-
       const printWindow = window.open('', '_blank');
       printWindow.document.write(`<!DOCTYPE html>
 <html>
@@ -657,42 +654,23 @@
   <table>
     <thead>
       <tr>
-        <th>Nama</th>
-        <th>Type</th>
-        <th>Lama</th>
-        <th>Baru</th>
-        <th>Stok</th>
-        <th>Lokasi</th>
-        <th>Status</th>
-        <th>Catatan</th>
+        <th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Lokasi</th><th>Status</th><th>Catatan</th>
       </tr>
     </thead>
     <tbody>
 `);
-
       selectedItems.forEach(it => {
         printWindow.document.write(`<tr>
-          <td>${escapeHtml(it.name)}</td>
-          <td>${escapeHtml(it.type || '-')}</td>
-          <td>${escapeHtml(it.lama || '-')}</td>
-          <td>${escapeHtml(it.baru || '-')}</td>
-          <td>${it.quantity}</td>
-          <td>${escapeHtml(it.location || '-')}</td>
-          <td>${escapeHtml(it.status || 'Baik')}</td>
-          <td>${escapeHtml(it.notes || '-')}</td>
+          <td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.type || '-')}</td><td>${escapeHtml(it.lama || '-')}</td>
+          <td>${escapeHtml(it.baru || '-')}</td><td>${it.quantity}</td><td>${escapeHtml(it.location || '-')}</td>
+          <td>${escapeHtml(it.status || 'Baik')}</td><td>${escapeHtml(it.notes || '-')}</td>
         </tr>`);
       });
-
       printWindow.document.write(`</tbody></table>
   <div class="footer">Dicetak pada: ${new Date().toLocaleString('id-ID')}</div>
-</body>
-</html>`);
+</body></html>`);
       printWindow.document.close();
-
-      // Buka dialog cetak setelah konten siap
-      setTimeout(() => {
-        printWindow.print();
-      }, 300);
+      setTimeout(() => { printWindow.print(); }, 300);
     }
     
     function printBarcode() { 
@@ -720,8 +698,7 @@
 
     // ==================== PEMINJAMAN ====================
     function renderBorrowForm() { 
-      const u=getCurrentUser(); 
-      if(!u) return '<div class="alert alert-warning">Login dulu</div>'; 
+      const u=getCurrentUser(); if(!u) return '<div class="alert alert-warning">Login dulu</div>'; 
       let opts='<option value="">Pilih Barang</option>'; 
       items.forEach(i=>opts+=`<option value="${i.id}" data-max="${i.quantity}">${i.name} (stok ${i.quantity})</option>`); 
       return `<div class="card"><div class="card-header bg-primary text-white">Form Peminjaman</div><div class="card-body"><div class="mb-3"><label>Nama Peminjam</label><input type="text" id="borrowerName" class="form-control" value="${u.name}" readonly></div><div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${opts}</select></div><div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div><div class="mb-3"><label>Tanggal Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div><div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div><div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div><button class="btn btn-primary" onclick="submitBorrow()">Ajukan Peminjaman</button></div></div>`; 
@@ -729,25 +706,18 @@
 
     async function submitBorrow() { 
       const u=getCurrentUser(); if(!u) return; 
-      const itemId=document.getElementById('borrowItem').value; 
-      if(!itemId) return showToast('Pilih barang','warning'); 
+      const itemId=document.getElementById('borrowItem').value; if(!itemId) return showToast('Pilih barang','warning'); 
       const item=items.find(i=>i.id===itemId); 
-      const qty=parseInt(document.getElementById('borrowQty').value); 
-      if(qty<=0||qty>item.quantity) return showToast('Jumlah tidak valid','warning'); 
-      const bd=document.getElementById('borrowDate').value, rd=document.getElementById('returnDate').value; 
-      if(!bd||!rd) return showToast('Isi tanggal','warning'); 
+      const qty=parseInt(document.getElementById('borrowQty').value); if(qty<=0||qty>item.quantity) return showToast('Jumlah tidak valid','warning'); 
+      const bd=document.getElementById('borrowDate').value, rd=document.getElementById('returnDate').value; if(!bd||!rd) return showToast('Isi tanggal','warning'); 
       const purpose=document.getElementById('purpose').value; 
       await db.collection('borrow_requests').add({ 
-        itemId, itemName:item.name, borrowerId:u.id, borrowerName:u.name, quantity:qty, 
-        borrowDate:bd, returnDate:rd, purpose, status:'pending', 
-        createdAt:firebase.firestore.FieldValue.serverTimestamp() 
-      }); 
+        itemId, itemName:item.name, borrowerId:u.id, borrowerName:u.name, quantity:qty, borrowDate:bd, returnDate:rd, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); 
       showToast('Permintaan diajukan','success'); navigate('myBorrows'); 
     }
 
     function renderMyBorrows() { 
-      const u=getCurrentUser(); 
-      const my=requests.filter(r=>r.borrowerId===u?.id); 
+      const u=getCurrentUser(); const my=requests.filter(r=>r.borrowerId===u?.id); 
       if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; 
       let h='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th></tr></thead><tbody>'; 
       my.forEach(r=>h+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning'}">${r.status}</td></tr>`); 
@@ -759,74 +729,42 @@
       if(!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada.</p>'; 
       let h='<h3>Permintaan Pending</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody>'; 
       pending.forEach(r=>h+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td>
-        <td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> 
-        <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`); 
+        <td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`); 
       h+='</tbody></table>'; return h; 
     }
 
     async function approveRequest(id) { 
-      const u=getCurrentUser(); 
-      if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menyetujui','error'); return; }
+      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menyetujui','error'); return; }
       const req=requests.find(r=>r.id===id); if(!req) return; 
-      const item=items.find(i=>i.id===req.itemId); 
-      if(item.quantity<req.quantity){ showToast('Stok tidak cukup','error'); return; } 
-      // Kurangi stok
+      const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ showToast('Stok tidak cukup','error'); return; } 
       await updateItem(item.id, {quantity: item.quantity - req.quantity});
-      await db.collection('borrow_requests').doc(id).update({status:'approved'}); 
-      showToast('Disetujui, stok berkurang','success'); 
+      await db.collection('borrow_requests').doc(id).update({status:'approved'}); showToast('Disetujui, stok berkurang','success'); 
     }
 
     async function rejectRequest(id) { 
-      const u=getCurrentUser(); 
-      if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menolak','error'); return; }
-      await db.collection('borrow_requests').doc(id).update({status:'rejected'}); 
-      showToast('Ditolak','info'); 
+      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menolak','error'); return; }
+      await db.collection('borrow_requests').doc(id).update({status:'rejected'}); showToast('Ditolak','info'); 
     }
 
-    // ==================== PENGEMBALIAN ====================
     function renderActiveLoans() {
       const active = requests.filter(r => r.status === 'approved');
       if (!active.length) return '<h3>Peminjaman Aktif</h3><p>Tidak ada barang yang sedang dipinjam.</p>';
       let html = '<h3>Peminjaman Aktif</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Tanggal Pinjam</th><th>Rencana Kembali</th><th>Aksi</th></tr></thead><tbody>';
       active.forEach(r => {
-        html += `<tr>
-          <td>${escapeHtml(r.borrowerName)}</td>
-          <td>${escapeHtml(r.itemName)}</td>
-          <td>${r.quantity}</td>
-          <td>${r.borrowDate}</td>
-          <td>${r.returnDate}</td>
-          <td><button class="btn btn-sm btn-primary" onclick="returnItem('${r.id}')"><i class="fas fa-undo-alt"></i> Kembalikan</button></td>
-        </tr>`;
+        html += `<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td>
+          <td><button class="btn btn-sm btn-primary" onclick="returnItem('${r.id}')"><i class="fas fa-undo-alt"></i> Kembalikan</button></td></tr>`;
       });
-      html += '</tbody></table>';
-      return html;
+      html += '</tbody></table>'; return html;
     }
 
     async function returnItem(requestId) {
-      const req = requests.find(r => r.id === requestId);
-      if (!req) return;
-      if (req.status !== 'approved') {
-        showToast('Peminjaman ini tidak dalam status aktif', 'error');
-        return;
-      }
+      const req = requests.find(r => r.id === requestId); if (!req) return;
+      if (req.status !== 'approved') { showToast('Peminjaman ini tidak dalam status aktif', 'error'); return; }
       if (!confirm(`Konfirmasi pengembalian ${req.itemName} (${req.quantity} pcs) oleh ${req.borrowerName}?`)) return;
-      
-      const item = items.find(i => i.id === req.itemId);
-      if (!item) {
-        showToast('Data barang tidak ditemukan', 'error');
-        return;
-      }
-      
-      // Kembalikan stok
+      const item = items.find(i => i.id === req.itemId); if (!item) { showToast('Data barang tidak ditemukan', 'error'); return; }
       const newQty = (item.quantity || 0) + req.quantity;
       await updateItem(item.id, { quantity: newQty });
-      
-      // Update status request menjadi 'returned' dan tambahkan tanggal kembali aktual
-      await db.collection('borrow_requests').doc(requestId).update({
-        status: 'returned',
-        actualReturnDate: new Date().toISOString().split('T')[0]
-      });
-      
+      await db.collection('borrow_requests').doc(requestId).update({ status: 'returned', actualReturnDate: new Date().toISOString().split('T')[0] });
       showToast('Barang berhasil dikembalikan, stok telah ditambah', 'success');
       if (currentPage === 'activeLoans') renderPage();
     }
@@ -836,15 +774,7 @@
       let h='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th><th>Tanggal Pinjam</th><th>Tanggal Kembali</th><th>Tanggal Pengembalian</th><tr></thead><tbody>'; 
       requests.forEach(r=> {
         const statusClass = r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning';
-        h+=`<tr>
-          <td>${escapeHtml(r.borrowerName)}</td>
-          <td>${escapeHtml(r.itemName)}</td>
-          <td>${r.quantity}</td>
-          <td class="${statusClass}">${escapeHtml(r.status)}</td>
-          <td>${escapeHtml(r.borrowDate||'-')}</td>
-          <td>${escapeHtml(r.returnDate||'-')}</td>
-          <td>${escapeHtml(r.actualReturnDate||'-')}</td>
-        </tr>`;
+        h+=`<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td class="${statusClass}">${escapeHtml(r.status)}</td><td>${escapeHtml(r.borrowDate||'-')}</td><td>${escapeHtml(r.returnDate||'-')}</td><td>${escapeHtml(r.actualReturnDate||'-')}</td></tr>`;
       }); 
       h+='</tbody></table>'; return h; 
     }
@@ -886,27 +816,44 @@
 
     async function deleteUser(id) { if(!confirm('Hapus user?')) return; if(await deleteUserById(id)) showToast('User dihapus','success'); else showToast('Gagal hapus','error'); }
 
-    // ==================== DETAIL ====================
     function showItemDetail(id) { const it=items.find(i=>i.id===id); if(it) displayItemDetailModal(it); else showToast('Tidak ditemukan','error'); }
     function displayItemDetailModal(it) {
       document.getElementById('itemDetailBody').innerHTML = `
         <div class="text-center mb-3">${it.image ? `<img src="${it.image}" class="item-image">` : '<div class="alert alert-secondary">Tidak ada gambar</div>'}</div>
         <h6 class="text-center text-primary fw-bold mb-3"><i class="fas fa-tag me-2"></i>Asset Sekolah Minggu GKPS Tangerang</h6>
-        <p><strong>Nama:</strong> ${escapeHtml(it.name)}</p><p><strong>Type:</strong> ${escapeHtml(it.type||'-')}</p><p><strong>Lama:</strong> ${escapeHtml(it.lama||'-')}</p><p><strong>Baru:</strong> ${escapeHtml(it.baru||'-')}</p><p><strong>Stok:</strong> ${it.quantity}</p><p><strong>Lokasi:</strong> ${escapeHtml(it.location||'-')}</p><p><strong>Status:</strong> ${escapeHtml(it.status||'Baik')}</p><p><strong>Catatan:</strong> ${escapeHtml(it.notes||'-')}</p>
-      `;
+        <p><strong>Nama:</strong> ${escapeHtml(it.name)}</p><p><strong>Type:</strong> ${escapeHtml(it.type||'-')}</p><p><strong>Lama:</strong> ${escapeHtml(it.lama||'-')}</p><p><strong>Baru:</strong> ${escapeHtml(it.baru||'-')}</p><p><strong>Stok:</strong> ${it.quantity}</p><p><strong>Lokasi:</strong> ${escapeHtml(it.location||'-')}</p><p><strong>Status:</strong> ${escapeHtml(it.status||'Baik')}</p><p><strong>Catatan:</strong> ${escapeHtml(it.notes||'-')}</p>`;
       new bootstrap.Modal(document.getElementById('itemDetailModal')).show();
     }
 
-    // ==================== PWA - SERVICE WORKER REGISTRATION ====================
+    // ==================== PWA - SERVICE WORKER + AUTO UPDATE ====================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
           .then(registration => {
             console.log('ServiceWorker terdaftar: ', registration.scope);
+            
+            // Cek update service worker
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // New content available, show toast & auto reload
+                  showToast('Update tersedia, memuat ulang...', 'info');
+                  setTimeout(() => window.location.reload(), 1500);
+                }
+              });
+            });
           })
-          .catch(err => {
-            console.log('ServiceWorker gagal: ', err);
-          });
+          .catch(err => console.log('ServiceWorker gagal: ', err));
+        
+        // Jika service worker baru mengambil alih, reload halaman
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
       });
     }
 
@@ -914,9 +861,9 @@
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const installBtn = document.getElementById('pwaInstallBtn');
-      installBtn.classList.add('show');
-      console.log('beforeinstallprompt fired, tombol install ditampilkan');
+      // Tampilkan tombol install, sembunyikan tombol buka
+      document.getElementById('pwaInstallBtn').classList.add('show');
+      document.getElementById('pwaOpenBtn').classList.remove('show');
     });
 
     function installPWA() {
@@ -933,19 +880,46 @@
           console.log('User menolak install');
         }
         deferredPrompt = null;
-        document.getElementById('pwaInstallBtn').classList.remove('show');
+        updatePWATombolState();
       });
+    }
+
+    // Tombol untuk membuka aplikasi yang sudah terpasang (membuka di jendela baru agar OS menawarkan aplikasi PWA)
+    function openPWA() {
+      window.open(window.location.href, '_blank', 'noopener');
+    }
+
+    // Perbarui visibilitas tombol Install / Buka berdasarkan status PWA
+    function updatePWATombolState() {
+      const installBtn = document.getElementById('pwaInstallBtn');
+      const openBtn = document.getElementById('pwaOpenBtn');
+      
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        // Sudah dijalankan dalam mode standalone (terpasang)
+        installBtn.classList.remove('show');
+        openBtn.classList.add('show');
+      } else {
+        // Belum terpasang, jika deferredPrompt ada tampilkan install, jika tidak sembunyikan keduanya
+        if (deferredPrompt) {
+          installBtn.classList.add('show');
+          openBtn.classList.remove('show');
+        } else {
+          installBtn.classList.remove('show');
+          openBtn.classList.remove('show');
+        }
+      }
     }
 
     window.addEventListener('appinstalled', () => {
       console.log('PWA berhasil diinstall');
-      document.getElementById('pwaInstallBtn').classList.remove('show');
       deferredPrompt = null;
+      updatePWATombolState();
     });
 
+    // Cek status awal
     if (window.matchMedia('(display-mode: standalone)').matches) {
-      console.log('Aplikasi berjalan dalam mode standalone');
       document.getElementById('pwaInstallBtn').classList.remove('show');
+      document.getElementById('pwaOpenBtn').classList.add('show');
     }
 
     // ==================== INIT ====================
