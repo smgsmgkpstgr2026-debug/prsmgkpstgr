@@ -5,35 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
   <title>Aplikasi Inventory & Peminjaman + Filter + Cetak + Cetak Barcode + Hapus Duplikat + Notifikasi</title>
   
-  <!-- ====== PWA META TAGS (DIPERBAIKI) ====== -->
   <meta name="theme-color" content="#0d6efd">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes"> <!-- Tambahan untuk iOS -->
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Inv GSM">
   <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiB2aWV3Qm94PSIwIDAgMTkyIDE5MiI+PHJlY3Qgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiIGZpbGw9IiMwZDZlZmQiLz48dGV4dCB4PSI5NiIgeT0iMTIwIiBmb250LXNpemU9IjEwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtZmFtaWx5PSJBcmlhbCI+STwvdGV4dD48L3N2Zz4=">
   
-  <!-- Manifest PWA -->
   <link rel="manifest" href="manifest.json">
   
-  <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- SheetJS (XLSX) -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-  <!-- PapaParse (CSV) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <!-- Firebase Authentication -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   
   <style>
-    /* CSS TIDAK BERUBAH */
     body { background-color: #f8f9fa; }
     .navbar { background-color: #0d6efd; }
     .navbar-brand, .nav-link { color: white !important; }
@@ -70,15 +60,8 @@
     }
     .image-preview-container { margin-top: 10px; text-align: center; }
     .image-preview { max-width: 100%; max-height: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 5px; background: #f8f9fa; }
-    
-    /* Tombol Install & Buka */
-    #pwaInstallBtn, #pwaOpenBtn {
-      display: none;
-      margin-right: 10px;
-    }
-    #pwaInstallBtn.show, #pwaOpenBtn.show {
-      display: inline-block !important;
-    }
+    #pwaInstallBtn, #pwaOpenBtn { display: none; margin-right: 10px; }
+    #pwaInstallBtn.show, #pwaOpenBtn.show { display: inline-block !important; }
   </style>
 </head>
 <body>
@@ -91,14 +74,8 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto" id="navLinks"></ul>
         <span class="navbar-text text-white me-3" id="userDisplay"></span>
-        <!-- Tombol install (muncul sebelum terpasang) -->
-        <button class="btn btn-light btn-sm" id="pwaInstallBtn" onclick="installPWA()">
-          <i class="fas fa-download"></i> Install Aplikasi
-        </button>
-        <!-- Tombol buka aplikasi (muncul setelah terpasang) -->
-        <button class="btn btn-outline-light btn-sm" id="pwaOpenBtn" onclick="openPWA()">
-          <i class="fas fa-external-link-alt"></i> Buka Aplikasi
-        </button>
+        <button class="btn btn-light btn-sm" id="pwaInstallBtn" onclick="installPWA()"><i class="fas fa-download"></i> Install Aplikasi</button>
+        <button class="btn btn-outline-light btn-sm" id="pwaOpenBtn" onclick="openPWA()"><i class="fas fa-external-link-alt"></i> Buka Aplikasi</button>
         <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -106,9 +83,7 @@
 
   <div class="container-fluid bg-light py-2 border-bottom border-primary border-2">
     <div class="container text-center">
-      <h5 class="mb-0 text-primary fw-bold">
-        <i class="fas fa-church me-2"></i>Sekolah Minggu GKPS Tangerang
-      </h5>
+      <h5 class="mb-0 text-primary fw-bold"><i class="fas fa-church me-2"></i>Sekolah Minggu GKPS Tangerang</h5>
     </div>
   </div>
 
@@ -145,7 +120,7 @@
   </div>
   <div class="modal fade" id="userModal" tabindex="-1">
     <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="userModalTitle">Tambah User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body"><input type="hidden" id="editUserId"><div class="mb-3"><label>Nama Lengkap</label><input type="text" class="form-control" id="userName" required></div><div class="mb-3"><label>Email</label><input type="email" class="form-control" id="userEmail" required></div><div class="mb-3"><label>Password</label><input type="password" class="form-control" id="userPassword" placeholder="Minimal 4 karakter"></div><div class="mb-3"><label>Role</label><select class="form-select" id="userRole"><option value="borrower">Peminjam</option><option value="editor">Editor</option><option value="admin">Admin</option></select></div></div>
+    <div class="modal-body"><input type="hidden" id="editUserId"><div class="mb-3"><label>Nama Lengkap</label><input type="text" class="form-control" id="userName" required></div><div class="mb-3"><label>Email</label><input type="email" class="form-control" id="userEmail" required></div><div class="mb-3"><label>Password <small class="text-muted">(min. 4 karakter)</small></label><input type="password" class="form-control" id="userPassword" placeholder="Kosongkan jika tidak mengubah"></div><div class="mb-3"><label>Role</label><select class="form-select" id="userRole"><option value="borrower">Peminjam</option><option value="editor">Editor</option><option value="admin">Admin</option></select></div></div>
     <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="button" class="btn btn-primary" onclick="saveUser()">Simpan</button></div></div></div>
   </div>
   <div class="modal fade" id="forgotPasswordModal" tabindex="-1">
@@ -212,6 +187,8 @@
         users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         isUsersLoading = false;
         if (users.length === 0) await createDefaultUsers();
+        // Migrasi user lama ke Firebase Auth jika belum punya uid
+        await migrateUsersToAuth();
         if (cb) cb(users);
         if (currentPage === 'manageUsers') renderPage();
       }, err => { console.error(err); showToast('Gagal sync user', 'error'); isUsersLoading = false; });
@@ -220,11 +197,47 @@
     async function createDefaultUsers() {
       try {
         const batch = db.batch();
+        // Admin default: test@inv.com / test2026
         batch.set(db.collection('users').doc(), { name:'Admin', email:'test@inv.com', password:'test2026', role:'admin', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         batch.set(db.collection('users').doc(), { name:'Editor', email:'editor@inv.com', password:'editor', role:'editor', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         batch.set(db.collection('users').doc(), { name:'Borrower', email:'user@inv.com', password:'user', role:'borrower', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         await batch.commit();
       } catch(e) { console.error(e); }
+    }
+
+    // Migrasi user existing ke Firebase Auth (jika belum punya uid)
+    async function migrateUsersToAuth() {
+      const apiKey = firebaseConfig.apiKey;
+      for (let user of users) {
+        if (!user.uid && user.email && user.password) {
+          try {
+            // Daftarkan ke Firebase Auth via REST API
+            const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: user.email, password: user.password, returnSecureToken: false })
+            });
+            const data = await res.json();
+            if (data.localId) {
+              await db.collection('users').doc(user.id).update({ uid: data.localId });
+              user.uid = data.localId;
+              console.log(`Migrasi ${user.email} berhasil`);
+            } else if (data.error && data.error.message === 'EMAIL_EXISTS') {
+              // Cari UID dari user yang sudah ada dengan email tersebut
+              const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, password: user.password, returnSecureToken: false })
+              });
+              const signInData = await signInRes.json();
+              if (signInData.localId) {
+                await db.collection('users').doc(user.id).update({ uid: signInData.localId });
+                user.uid = signInData.localId;
+              }
+            }
+          } catch(e) { console.warn('Migrasi gagal', user.email, e); }
+        }
+      }
     }
 
     // ==================== CRUD ====================
@@ -233,9 +246,83 @@
     async function deleteItem(id) { try { await db.collection('items').doc(id).delete(); return true; } catch(e) { showToast(e.message,'error'); return false; } }
     function getAllUsers() { return users; }
     function getUserById(id) { return users.find(u => u.id === id); }
-    async function addUser(user) { try { await db.collection('users').add({...user, createdAt:firebase.firestore.FieldValue.serverTimestamp()}); return true; } catch(e) { showToast(e.message,'error'); return false; } }
-    async function updateUserById(id, data) { try { const { createdAt, ...up } = data; await db.collection('users').doc(id).update(up); return true; } catch(e) { showToast(e.message,'error'); return false; } }
-    async function deleteUserById(id) { if (getCurrentUser()?.id === id) { showToast('Tidak bisa hapus sendiri','warning'); return false; } try { await db.collection('users').doc(id).delete(); return true; } catch(e) { showToast(e.message,'error'); return false; } }
+
+    // ==================== AUTH & USER MANAGEMENT ====================
+    async function registerUserToAuth(email, password) {
+      const apiKey = firebaseConfig.apiKey;
+      const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, returnSecureToken: false })
+      });
+      return res.json();
+    }
+
+    async function addUser(userData) {
+      try {
+        // Daftarkan ke Firebase Auth
+        const authResult = await registerUserToAuth(userData.email, userData.password);
+        if (authResult.error) {
+          if (authResult.error.message === 'EMAIL_EXISTS') {
+            // Ambil UID yang sudah ada
+            const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: userData.email, password: userData.password, returnSecureToken: false })
+            });
+            const signInData = await signInRes.json();
+            if (signInData.localId) {
+              userData.uid = signInData.localId;
+              delete userData.password; // jangan simpan password di Firestore
+              await db.collection('users').add({...userData, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+              return true;
+            } else {
+              throw new Error('Email sudah ada tetapi password salah?');
+            }
+          }
+          throw new Error(authResult.error.message);
+        }
+        userData.uid = authResult.localId;
+        delete userData.password; // tidak perlu menyimpan password lagi
+        await db.collection('users').add({...userData, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+        return true;
+      } catch(e) {
+        showToast('Gagal: ' + e.message, 'error');
+        return false;
+      }
+    }
+
+    async function updateUserById(id, data) {
+      try {
+        if (data.password) {
+          // Update password di Firebase Auth menggunakan REST API? Memerlukan idToken user.
+          // Untuk sekarang, admin tidak bisa mengubah password user langsung.
+          // Alternatif: kirim email reset password ke user.
+          showToast('Password tidak dapat diubah langsung oleh admin. Gunakan fitur Lupa Password.', 'warning');
+          delete data.password;
+        }
+        const { createdAt, ...up } = data;
+        await db.collection('users').doc(id).update(up);
+        return true;
+      } catch(e) { showToast(e.message,'error'); return false; }
+    }
+
+    async function deleteUserById(id) {
+      if (getCurrentUser()?.id === id) { showToast('Tidak bisa hapus sendiri','warning'); return false; }
+      try {
+        const user = users.find(u => u.id === id);
+        if (user && user.uid) {
+          // Hapus dari Firebase Auth melalui REST API? Memerlukan idToken admin. Tidak bisa.
+          // Nonaktifkan saja dengan flag disabled, dan hapus dari Firestore.
+          // Kita set disabled: true di Firestore lalu hapus? Lebih baik set disabled saja.
+          await db.collection('users').doc(id).update({ disabled: true });
+          showToast('User dinonaktifkan (tidak bisa login lagi)', 'success');
+          return true;
+        }
+        await db.collection('users').doc(id).delete();
+        return true;
+      } catch(e) { showToast(e.message,'error'); return false; }
+    }
 
     // ==================== SESSION ====================
     function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
@@ -248,7 +335,7 @@
       document.body.appendChild(t); setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(),500); },4000);
     }
 
-    // ==================== LUPA PASSWORD ====================
+    // ==================== LUPA PASSWORD (FIREBASE AUTH) ====================
     function showForgotPasswordModal() { 
       document.getElementById('forgotEmail').value=''; 
       document.getElementById('forgotPasswordMessage').classList.add('d-none'); 
@@ -390,10 +477,7 @@
     function renderNav() {
       const u = getCurrentUser(); const nav=document.getElementById('navLinks'), disp=document.getElementById('userDisplay');
       if(u) { 
-        let roleText = '';
-        if(u.role==='admin') roleText='Admin';
-        else if(u.role==='editor') roleText='Editor';
-        else roleText='Peminjam';
+        let roleText = ''; if(u.role==='admin') roleText='Admin'; else if(u.role==='editor') roleText='Editor'; else roleText='Peminjam';
         disp.innerText = `Halo, ${u.name} (${roleText})`;
         let links=''; 
         if(u.role==='admin') {
@@ -433,38 +517,53 @@
       else if(currentPage==='inventory') c.innerHTML=renderInventory(); 
       else if(currentPage==='borrowForm') c.innerHTML=renderBorrowForm(); 
       else if(currentPage==='myBorrows') c.innerHTML=renderMyBorrows();
-      else if(currentPage==='borrowRequests') {
-        if(u?.role !== 'admin') c.innerHTML = '<div class="alert alert-danger">Akses ditolak</div>';
-        else c.innerHTML=renderBorrowRequests();
-      }
-      else if(currentPage==='activeLoans') {
-        if(!(u?.role === 'admin' || u?.role === 'editor')) c.innerHTML = '<div class="alert alert-danger">Akses ditolak</div>';
-        else c.innerHTML=renderActiveLoans();
-      }
+      else if(currentPage==='borrowRequests') { if(u?.role !== 'admin') c.innerHTML = '<div class="alert alert-danger">Akses ditolak</div>'; else c.innerHTML=renderBorrowRequests(); }
+      else if(currentPage==='activeLoans') { if(!(u?.role === 'admin' || u?.role === 'editor')) c.innerHTML = '<div class="alert alert-danger">Akses ditolak</div>'; else c.innerHTML=renderActiveLoans(); }
       else if(currentPage==='history') c.innerHTML=renderHistory();
-      else if(currentPage==='manageUsers') {
-        if(u?.role !== 'admin') c.innerHTML = '<div class="alert alert-danger">Akses ditolak</div>';
-        else c.innerHTML=renderManageUsers();
-      }
+      else if(currentPage==='manageUsers') { if(u?.role !== 'admin') c.innerHTML = '<div class="alert alert-danger">Akses ditolak</div>'; else c.innerHTML=renderManageUsers(); }
       renderNav(); 
     }
 
+    // LOGIN PAGE (Firebase Auth)
     function renderLogin() { 
-      return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control" placeholder="contoh: test@inv.com" value=""></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control" placeholder="contoh: test2026" value=""></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div></div></div></div></div>`; 
+      return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control" placeholder="contoh: test@inv.com"></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control" placeholder="Masukkan password"></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div></div></div></div></div>`; 
     }
 
     async function doLogin() { 
-      const email=document.getElementById('loginEmail').value.trim(), pass=document.getElementById('loginPassword').value; 
-      const u=users.find(x=>x.email===email&&x.password===pass); 
-      if(u){ 
-        setCurrentUser({id:u.id,name:u.name,email:u.email,role:u.role}); 
-        startItemsListener(); 
-        startRequestsListener(); 
-        navigate('inventory'); 
-      } else showToast('Email/password salah','error'); 
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      try {
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        // Ambil data user dari Firestore berdasarkan email
+        const snapshot = await db.collection('users').where('email', '==', email).get();
+        if (snapshot.empty) {
+          await auth.signOut();
+          showToast('User tidak ditemukan di database lokal', 'error');
+          return;
+        }
+        const userDoc = snapshot.docs[0];
+        const userData = userDoc.data();
+        if (userData.disabled) {
+          await auth.signOut();
+          showToast('Akun dinonaktifkan. Hubungi admin.', 'error');
+          return;
+        }
+        setCurrentUser({ id: userDoc.id, name: userData.name, email: userData.email, role: userData.role });
+        startItemsListener();
+        startRequestsListener();
+        navigate('inventory');
+      } catch(e) {
+        console.error(e);
+        if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-email' || e.code === 'auth/wrong-password') {
+          showToast('Email atau password salah', 'error');
+        } else {
+          showToast('Login gagal: ' + e.message, 'error');
+        }
+      }
     }
 
     function logout() { 
+      auth.signOut().catch(e => console.warn);
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); 
       if(itemsListener) itemsListener(); 
       if(requestsListener) requestsListener(); 
@@ -492,41 +591,27 @@
       filtered.forEach(it => {
         html += `<tr>
           <td class="text-center"><input type="checkbox" class="item-checkbox" value="${it.id}" onclick="updateDeleteButtonVisibility()"></td>
-          <td>${escapeHtml(it.name)}</td>
-          <td>${escapeHtml(it.type||'-')}</td>
-          <td>${escapeHtml(it.lama||'-')}</td>
-          <td>${escapeHtml(it.baru||'-')}</td>
-          <td>${it.quantity}</td>
-          <td>${escapeHtml(it.status||'Baik')}</td>
-          <td>${escapeHtml((it.notes||'').substring(0,30))}</td>
+          <td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.type||'-')}</td><td>${escapeHtml(it.lama||'-')}</td><td>${escapeHtml(it.baru||'-')}</td>
+          <td>${it.quantity}</td><td>${escapeHtml(it.status||'Baik')}</td><td>${escapeHtml((it.notes||'').substring(0,30))}</td>
           <td>${it.image ? `<img src="${it.image}" style="max-height:40px;max-width:60px;object-fit:contain;cursor:pointer;" onclick="showItemDetail('${it.id}')">` : '-'}</td>
           <td><div class="qr-code" id="qr-${it.id}" onclick="showItemDetail('${it.id}')"></div></td>
           ${user?.role==='admin' || user?.role==='editor' ? `<td><button class="btn btn-sm btn-warning" onclick="editItem('${it.id}')"><i class="fas fa-edit"></i></button> <button class="btn btn-sm btn-danger" onclick="deleteItemConfirm('${it.id}')"><i class="fas fa-trash"></i></button></td>` : ''}
         </tr>`;
       });
       tbody.innerHTML = html;
-      
       setTimeout(() => {
         filtered.forEach(it => {
           const container = document.getElementById(`qr-${it.id}`);
           if (container) {
             container.innerHTML = '';
-            try {
-              new QRCode(container, {
-                text: window.location.origin + window.location.pathname + '?item=' + it.id,
-                width: 100, height: 100
-              });
-              qrGeneratedForItems.add(it.id);
-            } catch (e) { console.warn('QR gagal', it.id, e); }
+            try { new QRCode(container, { text: window.location.origin + window.location.pathname + '?item=' + it.id, width: 100, height: 100 }); qrGeneratedForItems.add(it.id); } catch(e) {}
           }
         });
         updateDeleteButtonVisibility();
-        const selectAll = document.getElementById('selectAllCheckbox');
-        if (selectAll) selectAll.checked = false;
+        const selectAll = document.getElementById('selectAllCheckbox'); if (selectAll) selectAll.checked = false;
       }, 30);
     }
 
-    // (Fungsi renderInventory, updateFilter, dsb tetap)
     function updateFilter() { filterName = document.getElementById('filterNameInput')?.value || ''; updateInventoryTableBody(); }
     function updateSortOrder(v) { sortOrder = v; updateInventoryTableBody(); }
     function resetFilterSort() { 
@@ -555,12 +640,7 @@
       html += `</div></div>
                <div class="row mb-3">
                  <div class="col-md-4"><input type="text" class="form-control" id="filterNameInput" placeholder="Cari (pisah kata dengan spasi)" value="${escapeHtml(filterName)}" oninput="updateFilter()"></div>
-                 <div class="col-md-3">
-                   <select class="form-select" id="sortOrderSelect" onchange="updateSortOrder(this.value)">
-                     <option value="asc" ${sortOrder==='asc'?'selected':''}>A→Z</option>
-                     <option value="desc" ${sortOrder==='desc'?'selected':''}>Z→A</option>
-                   </select>
-                 </div>
+                 <div class="col-md-3"><select class="form-select" id="sortOrderSelect" onchange="updateSortOrder(this.value)"><option value="asc" ${sortOrder==='asc'?'selected':''}>A→Z</option><option value="desc" ${sortOrder==='desc'?'selected':''}>Z→A</option></select></div>
                  <div class="col-md-2"><button class="btn btn-secondary" onclick="resetFilterSort()">Reset</button></div>
                </div>`;
       const filtered = getFilteredAndSortedItems();
@@ -570,27 +650,24 @@
                    <th width="40"><input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll()"></th>
                    <th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Status</th><th>Catatan</th><th>Gambar</th><th>QR</th>
                    ${user?.role==='admin' || user?.role==='editor' ? '<th>Aksi</th>' : ''}
-                  </tr></thead>
-                 <tbody id="inventoryTableBody"></tbody></table></div>`;
+                  </tr></thead><tbody id="inventoryTableBody"></tbody></table></div>`;
       }
       setTimeout(() => updateInventoryTableBody(), 20);
       return html;
     }
 
-    // Fungsi cetak (dari perbaikan sebelumnya)
     function printInventory() {
-      const selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
-      if (selectedCheckboxes.length === 0) { showToast('Pilih minimal satu item dengan mencentang kotak di sebelah kiri', 'warning'); return; }
-      const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-      const selectedItems = items.filter(i => selectedIds.includes(i.id));
-      if (selectedItems.length === 0) { showToast('Item yang dipilih tidak ditemukan', 'error'); return; }
-      selectedItems.sort((a, b) => a.name.localeCompare(b.name));
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>Cetak Inventory</title><style>body{font-family:Arial;margin:20px;color:#000}h2{text-align:center;margin-bottom:5px}.subtitle{text-align:center;font-size:13px;color:#555;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #000;padding:6px;text-align:left}th{background-color:#f2f2f2}.footer{text-align:center;margin-top:20px;font-size:10px;color:#555}@media print{.no-print{display:none}body{margin:0}table{font-size:10px}}</style></head><body><h2>Daftar Inventory</h2><div class="subtitle">Sekolah Minggu GKPS Tangerang</div><div class="no-print" style="text-align:center;margin-bottom:15px"><button onclick="window.print()" style="padding:8px 16px;font-size:14px">Cetak Sekarang</button></div><table><thead><tr><th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Lokasi</th><th>Status</th><th>Catatan</th></tr></thead><tbody>`);
-      selectedItems.forEach(it => printWindow.document.write(`<tr><td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.type||'-')}</td><td>${escapeHtml(it.lama||'-')}</td><td>${escapeHtml(it.baru||'-')}</td><td>${it.quantity}</td><td>${escapeHtml(it.location||'-')}</td><td>${escapeHtml(it.status||'Baik')}</td><td>${escapeHtml(it.notes||'-')}</td></tr>`));
-      printWindow.document.write(`</tbody></table><div class="footer">Dicetak pada: ${new Date().toLocaleString('id-ID')}</div></body></html>`);
-      printWindow.document.close();
-      setTimeout(() => { printWindow.print(); }, 300);
+      const sel = document.querySelectorAll('.item-checkbox:checked');
+      if(!sel.length){ showToast('Pilih minimal satu item','warning'); return; }
+      const ids = Array.from(sel).map(c=>c.value);
+      const selected = items.filter(i=>ids.includes(i.id));
+      selected.sort((a,b)=>a.name.localeCompare(b.name));
+      const w = window.open('','_blank');
+      w.document.write(`<!DOCTYPE html><html><head><title>Cetak Inventory</title><style>body{font-family:Arial;margin:20px}h2{text-align:center}.subtitle{text-align:center;font-size:13px;color:#555;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #000;padding:6px}th{background:#f2f2f2}.footer{text-align:center;margin-top:20px;font-size:10px}@media print{.no-print{display:none}body{margin:0}}</style></head><body><h2>Daftar Inventory</h2><div class="subtitle">Sekolah Minggu GKPS Tangerang</div><div class="no-print" style="text-align:center;margin-bottom:15px"><button onclick="window.print()">Cetak</button></div><table><thead><tr><th>Nama</th><th>Type</th><th>Lama</th><th>Baru</th><th>Stok</th><th>Lokasi</th><th>Status</th><th>Catatan</th></tr></thead><tbody>`);
+      selected.forEach(i=>w.document.write(`<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.type||'-')}</td><td>${escapeHtml(i.lama||'-')}</td><td>${escapeHtml(i.baru||'-')}</td><td>${i.quantity}</td><td>${escapeHtml(i.location||'-')}</td><td>${escapeHtml(i.status||'Baik')}</td><td>${escapeHtml(i.notes||'-')}</td></tr>`));
+      w.document.write(`</tbody></table><div class="footer">Dicetak: ${new Date().toLocaleString('id-ID')}</div></body></html>`);
+      w.document.close();
+      setTimeout(()=>w.print(),300);
     }
     
     function printBarcode() { 
@@ -601,16 +678,14 @@
       w.document.write(`<!DOCTYPE html><html><head><title>Barcode</title><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><style>.barcode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:20px} .barcode-item{text-align:center;border:1px solid #ccc;padding:10px} .qr-container{width:150px;height:150px;margin:0 auto} @media print{.barcode-item{border:none}}</style></head><body><div style="text-align:center;margin-bottom:20px"><button onclick="window.print()">Cetak</button></div><div class="barcode-grid" id="grid"></div><script>const items=${JSON.stringify(toPrint.map(i=>({id:i.id,name:i.name})))}; const base=window.location.origin+window.location.pathname; items.forEach(i=>{const d=document.createElement('div');d.className='barcode-item';d.innerHTML='<div class="qr-container" id="qr-'+i.id+'"></div><div>'+i.name+'</div>';grid.appendChild(d);}); setTimeout(()=>{items.forEach(i=>{new QRCode(document.getElementById('qr-'+i.id),{text:base+'?item='+i.id,width:150,height:150})})},100);<\/script></body></html>`); 
       w.document.close(); 
     }
-    
+
     // ==================== PEMINJAMAN ====================
-    // ... (fungsi renderBorrowForm, submitBorrow, renderMyBorrows, renderBorrowRequests, approveRequest, REJECT REQUEST DENGAN ALASAN)
     function renderBorrowForm() { 
       const u=getCurrentUser(); if(!u) return '<div class="alert alert-warning">Login dulu</div>'; 
       let opts='<option value="">Pilih Barang</option>'; 
       items.forEach(i=>opts+=`<option value="${i.id}" data-max="${i.quantity}">${i.name} (stok ${i.quantity})</option>`); 
       return `<div class="card"><div class="card-header bg-primary text-white">Form Peminjaman</div><div class="card-body"><div class="mb-3"><label>Nama Peminjam</label><input type="text" id="borrowerName" class="form-control" value="${u.name}" readonly></div><div class="mb-3"><label>Barang</label><select id="borrowItem" class="form-select">${opts}</select></div><div class="mb-3"><label>Jumlah</label><input type="number" id="borrowQty" class="form-control" min="1"></div><div class="mb-3"><label>Tanggal Pinjam</label><input type="date" id="borrowDate" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div><div class="mb-3"><label>Rencana Kembali</label><input type="date" id="returnDate" class="form-control"></div><div class="mb-3"><label>Keperluan</label><textarea id="purpose" class="form-control" rows="2"></textarea></div><button class="btn btn-primary" onclick="submitBorrow()">Ajukan Peminjaman</button></div></div>`; 
     }
-
     async function submitBorrow() { 
       const u=getCurrentUser(); if(!u) return; 
       const itemId=document.getElementById('borrowItem').value; if(!itemId) return showToast('Pilih barang','warning'); 
@@ -618,11 +693,9 @@
       const qty=parseInt(document.getElementById('borrowQty').value); if(qty<=0||qty>item.quantity) return showToast('Jumlah tidak valid','warning'); 
       const bd=document.getElementById('borrowDate').value, rd=document.getElementById('returnDate').value; if(!bd||!rd) return showToast('Isi tanggal','warning'); 
       const purpose=document.getElementById('purpose').value; 
-      await db.collection('borrow_requests').add({ 
-        itemId, itemName:item.name, borrowerId:u.id, borrowerName:u.name, quantity:qty, borrowDate:bd, returnDate:rd, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); 
+      await db.collection('borrow_requests').add({ itemId, itemName:item.name, borrowerId:u.id, borrowerName:u.name, quantity:qty, borrowDate:bd, returnDate:rd, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); 
       showToast('Permintaan diajukan','success'); navigate('myBorrows'); 
     }
-
     function renderMyBorrows() { 
       const u=getCurrentUser(); const my=requests.filter(r=>r.borrowerId===u?.id); 
       if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; 
@@ -630,82 +703,106 @@
       my.forEach(r=>h+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning'}">${r.status}</td><td>${r.rejectionReason||'-'}</td></tr>`); 
       h+='</tbody></table>'; return h; 
     }
-
     function renderBorrowRequests() { 
       const pending=requests.filter(r=>r.status==='pending'); 
       if(!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada.</p>'; 
       let h='<h3>Permintaan Pending</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Aksi</th></tr></thead><tbody>'; 
-      pending.forEach(r=>h+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td>
-        <td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> 
-        <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`); 
+      pending.forEach(r=>h+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`); 
       h+='</tbody></table>'; return h; 
     }
-
     async function approveRequest(id) { 
-      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menyetujui','error'); return; }
+      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin','error'); return; }
       const req=requests.find(r=>r.id===id); if(!req) return; 
       const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ showToast('Stok tidak cukup','error'); return; } 
       await updateItem(item.id, {quantity: item.quantity - req.quantity});
-      await db.collection('borrow_requests').doc(id).update({status:'approved'}); showToast('Disetujui, stok berkurang','success'); 
+      await db.collection('borrow_requests').doc(id).update({status:'approved'}); showToast('Disetujui','success'); 
     }
-
     async function rejectRequest(id) { 
-      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menolak','error'); return; }
+      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin','error'); return; }
       const reason = prompt('Alasan penolakan (boleh kosong):');
-      if (reason === null) return; // user klik cancel
+      if (reason === null) return;
       const updateData = { status: 'rejected' };
       if (reason.trim()) updateData.rejectionReason = reason.trim();
       await db.collection('borrow_requests').doc(id).update(updateData);
-      showToast('Permintaan ditolak','info'); 
+      showToast('Ditolak','info'); 
     }
-
-    // PENGEMBALIAN
     function renderActiveLoans() {
       const active = requests.filter(r => r.status === 'approved');
-      if (!active.length) return '<h3>Peminjaman Aktif</h3><p>Tidak ada barang yang sedang dipinjam.</p>';
+      if (!active.length) return '<h3>Peminjaman Aktif</h3><p>Tidak ada.</p>';
       let html = '<h3>Peminjaman Aktif</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Tanggal Pinjam</th><th>Rencana Kembali</th><th>Aksi</th></tr></thead><tbody>';
-      active.forEach(r => {
-        html += `<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td><button class="btn btn-sm btn-primary" onclick="returnItem('${r.id}')"><i class="fas fa-undo-alt"></i> Kembalikan</button></td></tr>`;
-      });
+      active.forEach(r => html += `<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td><button class="btn btn-sm btn-primary" onclick="returnItem('${r.id}')"><i class="fas fa-undo-alt"></i> Kembalikan</button></td></tr>`);
       html += '</tbody></table>'; return html;
     }
-
     async function returnItem(requestId) {
       const req = requests.find(r => r.id === requestId); if (!req) return;
-      if (req.status !== 'approved') { showToast('Peminjaman ini tidak dalam status aktif', 'error'); return; }
+      if (req.status !== 'approved') { showToast('Peminjaman tidak aktif', 'error'); return; }
       if (!confirm(`Konfirmasi pengembalian ${req.itemName} (${req.quantity} pcs) oleh ${req.borrowerName}?`)) return;
       const item = items.find(i => i.id === req.itemId); if (!item) { showToast('Data barang tidak ditemukan', 'error'); return; }
       const newQty = (item.quantity || 0) + req.quantity;
       await updateItem(item.id, { quantity: newQty });
       await db.collection('borrow_requests').doc(requestId).update({ status: 'returned', actualReturnDate: new Date().toISOString().split('T')[0] });
-      showToast('Barang berhasil dikembalikan, stok telah ditambah', 'success');
+      showToast('Berhasil dikembalikan', 'success');
       if (currentPage === 'activeLoans') renderPage();
     }
-
     function renderHistory() { 
-      if(!requests.length) return '<h3>Riwayat Peminjaman</h3><p>Kosong</p>'; 
-      let h='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th><th>Tanggal Pinjam</th><th>Tanggal Kembali</th><th>Tanggal Pengembalian</th><th>Alasan Tolak</th></tr></thead><tbody>'; 
+      if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; 
+      let h='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th><th>Tanggal Pinjam</th><th>Rencana Kembali</th><th>Tanggal Kembali</th><th>Alasan Tolak</th></tr></thead><tbody>'; 
       requests.forEach(r=> {
-        const statusClass = r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning';
-        h+=`<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td class="${statusClass}">${escapeHtml(r.status)}</td><td>${escapeHtml(r.borrowDate||'-')}</td><td>${escapeHtml(r.returnDate||'-')}</td><td>${escapeHtml(r.actualReturnDate||'-')}</td><td>${escapeHtml(r.rejectionReason||'-')}</td></tr>`;
+        const cls = r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning';
+        h+=`<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td class="${cls}">${escapeHtml(r.status)}</td><td>${escapeHtml(r.borrowDate||'-')}</td><td>${escapeHtml(r.returnDate||'-')}</td><td>${escapeHtml(r.actualReturnDate||'-')}</td><td>${escapeHtml(r.rejectionReason||'-')}</td></tr>`;
       }); 
       h+='</tbody></table>'; return h; 
     }
 
-    // MANAGE USERS (tetap)
+    // ==================== MANAGE USERS ====================
     function renderManageUsers() { 
       const u=getCurrentUser(); if(!u||u.role!=='admin') return '<div class="alert alert-danger">Akses ditolak</div>'; 
       if(isUsersLoading) return '<div class="text-center"><div class="spinner-border"></div> Memuat data user...</div>'; 
-      let h=`<div class="d-flex justify-content-between mb-3"><h3><i class="fas fa-users"></i> Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Tambah User</button></div><table class="table table-bordered"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Aksi</th></tr></thead><tbody>`; 
+      let h=`<div class="d-flex justify-content-between mb-3"><h3><i class="fas fa-users"></i> Kelola User</h3><button class="btn btn-primary" onclick="showAddUserModal()"><i class="fas fa-plus"></i> Tambah User</button></div><table class="table table-bordered"><thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead><tbody>`; 
       users.forEach(usr=> {
         let roleDisplay = ''; if(usr.role==='admin') roleDisplay='Admin'; else if(usr.role==='editor') roleDisplay='Editor'; else roleDisplay='Peminjam';
-        h+=`<tr><td>${escapeHtml(usr.name)} ${u.id===usr.id?'<span class="badge bg-info">Anda</span>':''}</td><td>${escapeHtml(usr.email)}</td><td>${roleDisplay}</td>
+        const disabled = usr.disabled ? '<span class="badge bg-danger">Nonaktif</span>' : '<span class="badge bg-success">Aktif</span>';
+        h+=`<tr><td>${escapeHtml(usr.name)} ${u.id===usr.id?'<span class="badge bg-info">Anda</span>':''}</td><td>${escapeHtml(usr.email)}</td><td>${roleDisplay}</td><td>${disabled}</td>
         <td><button class="btn btn-sm btn-warning" onclick="editUser('${usr.id}')"><i class="fas fa-edit"></i></button> 
         <button class="btn btn-sm btn-danger" onclick="deleteUser('${usr.id}')" ${u.id===usr.id?'disabled':''}><i class="fas fa-trash"></i></button></td></tr>`;
       }); 
       h+='</tbody></table>'; return h; 
     }
-    // (showAddUserModal, editUser, openUserModal, saveUser, deleteUser tidak berubah)
+
+    function showAddUserModal() { openUserModal(null); }
+    function editUser(id) { openUserModal(getUserById(id)); }
+    function openUserModal(user) { 
+      const isEdit=!!user; document.getElementById('userModalTitle').innerText=isEdit?'Edit User':'Tambah User'; 
+      document.getElementById('editUserId').value=user?.id||''; document.getElementById('userName').value=user?.name||''; 
+      document.getElementById('userEmail').value=user?.email||''; document.getElementById('userPassword').value=''; 
+      document.getElementById('userPassword').placeholder=isEdit?'Password tidak dapat diubah':'Minimal 4 karakter'; 
+      document.getElementById('userRole').value=user?.role||'borrower'; 
+      if(userModalInstance) userModalInstance.dispose(); 
+      userModalInstance=new bootstrap.Modal(document.getElementById('userModal'),{backdrop:'static'}); userModalInstance.show(); 
+    }
+
+    async function saveUser() { 
+      const id=document.getElementById('editUserId').value, name=document.getElementById('userName').value.trim(), email=document.getElementById('userEmail').value.trim(), pass=document.getElementById('userPassword').value, role=document.getElementById('userRole').value; 
+      if(!name||!email){ showToast('Nama dan email harus diisi','warning'); return; } 
+      const exist=users.find(u=>u.email===email&&u.id!==id); if(exist){ showToast('Email sudah digunakan','error'); return; } 
+      if(!id){ 
+        if(!pass||pass.length<4){ showToast('Password minimal 4 karakter','warning'); return; } 
+        const success = await addUser({name,email,password:pass,role}); 
+        if(success) showToast('User ditambahkan (terdaftar di Auth)','success'); 
+      } else { 
+        const upd={name,email,role}; 
+        if(pass){ showToast('Password tidak bisa diubah admin. Gunakan Lupa Password.','warning'); } 
+        await updateUserById(id,upd); 
+        if(getCurrentUser().id===id) setCurrentUser({...getCurrentUser(),name,email,role}); 
+        showToast('User diupdate','success'); 
+      } 
+      userModalInstance.hide(); 
+    }
+
+    async function deleteUser(id) { 
+      if(!confirm('Nonaktifkan user?')) return; 
+      if(await deleteUserById(id)) showToast('User dinonaktifkan','success'); 
+    }
 
     function escapeHtml(s) { if(!s) return ''; return s.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
     function updateDeleteButtonVisibility() { const b=document.getElementById('deleteSelectedBtn'); if(b) b.style.display = document.querySelectorAll('.item-checkbox:checked').length ? 'inline-block':'none'; }
@@ -721,11 +818,10 @@
       updateDeleteButtonVisibility(); 
     }
 
-    // ==================== PWA - SERVICE WORKER & AUTO UPDATE ====================
+    // ==================== PWA ====================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
-          console.log('SW terdaftar');
           reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             newWorker.addEventListener('statechange', () => {
@@ -736,25 +832,16 @@
             });
           });
         });
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload();
-        });
+        navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
       });
     }
-
-    // ==================== PWA - INSTALL & DETEKSI STATUS ====================
     window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
+      e.preventDefault(); deferredPrompt = e;
       document.getElementById('pwaInstallBtn').classList.add('show');
       document.getElementById('pwaOpenBtn').classList.remove('show');
     });
-
     function installPWA() {
-      if (!deferredPrompt) {
-        showToast('Fitur install belum tersedia.', 'warning');
-        return;
-      }
+      if (!deferredPrompt) { showToast('Fitur install belum tersedia.', 'warning'); return; }
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(choice => {
         if (choice.outcome === 'accepted') {
@@ -765,17 +852,12 @@
         updatePWATombolState();
       });
     }
-
-    function openPWA() {
-      window.open(window.location.href, '_blank', 'noopener');
-    }
-
+    function openPWA() { window.open(window.location.href, '_blank', 'noopener'); }
     function updatePWATombolState() {
       const installBtn = document.getElementById('pwaInstallBtn');
       const openBtn = document.getElementById('pwaOpenBtn');
-      const isInstalled = localStorage.getItem(STORAGE_KEYS.PWA_INSTALLED) === 'true' 
-                          || window.matchMedia('(display-mode: standalone)').matches;
-      if (isInstalled) {
+      const installed = localStorage.getItem(STORAGE_KEYS.PWA_INSTALLED) === 'true' || window.matchMedia('(display-mode: standalone)').matches;
+      if (installed) {
         installBtn.classList.remove('show');
         openBtn.classList.add('show');
       } else {
@@ -784,14 +866,11 @@
         else installBtn.classList.remove('show');
       }
     }
-
     window.addEventListener('appinstalled', () => {
       localStorage.setItem(STORAGE_KEYS.PWA_INSTALLED, 'true');
       deferredPrompt = null;
       updatePWATombolState();
     });
-
-    // Cek awal
     updatePWATombolState();
 
     // ==================== INIT ====================
@@ -805,8 +884,29 @@
           else document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Barang tidak ditemukan</div>';
         } catch(e) { document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Error</div>'; }
       } else {
-        const u = getCurrentUser();
-        if(u) { startItemsListener(); startRequestsListener(); navigate('inventory'); } else navigate('login');
+        // Jika sudah login, langsung ke inventory
+        auth.onAuthStateChanged(async user => {
+          if (user) {
+            const snapshot = await db.collection('users').where('email', '==', user.email).get();
+            if (!snapshot.empty) {
+              const u = snapshot.docs[0];
+              if (!u.data().disabled) {
+                setCurrentUser({ id: u.id, name: u.data().name, email: u.data().email, role: u.data().role });
+                startItemsListener();
+                startRequestsListener();
+                navigate('inventory');
+              } else {
+                auth.signOut();
+                navigate('login');
+              }
+            } else {
+              auth.signOut();
+              navigate('login');
+            }
+          } else {
+            navigate('login');
+          }
+        });
       }
     };
   </script>
