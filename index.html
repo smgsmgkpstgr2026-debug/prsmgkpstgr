@@ -61,8 +61,8 @@
     }
     .image-preview-container { margin-top: 10px; text-align: center; }
     .image-preview { max-width: 100%; max-height: 200px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; padding: 5px; background: #f8f9fa; }
-    #pwaInstallBtn, #pwaOpenBtn { display: none; margin-right: 10px; }
-    #pwaInstallBtn.show, #pwaOpenBtn.show { display: inline-block !important; }
+    #pwaInstallBtn { display: none; margin-right: 10px; }
+    #pwaInstallBtn.show { display: inline-block !important; }
   </style>
 </head>
 <body>
@@ -75,8 +75,8 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto" id="navLinks"></ul>
         <span class="navbar-text text-white me-3" id="userDisplay"></span>
+        <!-- Hanya tombol install, tombol buka aplikasi DIHAPUS -->
         <button class="btn btn-light btn-sm" id="pwaInstallBtn" onclick="installPWA()"><i class="fas fa-download"></i> Install Aplikasi</button>
-        <button class="btn btn-outline-light btn-sm" id="pwaOpenBtn" onclick="openPWA()"><i class="fas fa-external-link-alt"></i> Buka Aplikasi</button>
         <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
@@ -332,13 +332,10 @@
       }
     }
 
-    // ==================== UPLOAD & PREVIEW (DIPERBAIKI) ====================
+    // ==================== UPLOAD & PREVIEW ====================
     function uploadImage(file) {
-      // Batasi ukuran file asli, agar base64 tidak terlalu besar
-      const MAX_FILE_SIZE = 700 * 1024; // 700 KB
-      if (file.size > MAX_FILE_SIZE) {
-        throw new Error('Ukuran gambar terlalu besar. Maksimal 700KB.');
-      }
+      const MAX_FILE_SIZE = 700 * 1024;
+      if (file.size > MAX_FILE_SIZE) throw new Error('Ukuran gambar terlalu besar. Maksimal 700KB.');
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = e => resolve(e.target.result);
@@ -354,17 +351,13 @@
         if (!file) return;
         try {
           const base64 = await uploadImage(file);
-          // Batasi panjang string base64 (Firestore batas ~1MB per dokumen, kita amankan 900KB)
-          if (base64.length > 900000) {
-            throw new Error('Gambar terlalu besar setelah konversi. Maksimal 1MB.');
-          }
+          if (base64.length > 900000) throw new Error('Gambar terlalu besar setelah konversi. Maksimal 1MB.');
           document.getElementById('itemImageUrl').value = base64;
           updateImagePreview();
           showToast('Gambar berhasil diunggah', 'success');
         } catch (err) {
           showToast('Upload gagal: ' + err.message, 'error');
         }
-        // Reset input file agar bisa mengupload file yang sama
         inp.value = '';
       };
       inp.click();
@@ -678,7 +671,7 @@
       w.document.close(); 
     }
 
-    // ==================== PEMINJAMAN ====================
+    // ==================== PEMINJAMAN (DENGAN APPROVER) ====================
     function renderBorrowForm() { 
       const u=getCurrentUser(); if(!u) return '<div class="alert alert-warning">Login dulu</div>'; 
       let opts='<option value="">Pilih Barang</option>'; 
@@ -695,13 +688,18 @@
       await db.collection('borrow_requests').add({ itemId, itemName:item.name, borrowerId:u.id, borrowerName:u.name, quantity:qty, borrowDate:bd, returnDate:rd, purpose, status:'pending', createdAt:firebase.firestore.FieldValue.serverTimestamp() }); 
       showToast('Permintaan diajukan','success'); navigate('myBorrows'); 
     }
+
     function renderMyBorrows() { 
       const u=getCurrentUser(); const my=requests.filter(r=>r.borrowerId===u?.id); 
       if(!my.length) return '<h3>Peminjamanku</h3><p>Belum ada.</p>'; 
-      let h='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th><th>Alasan</th></tr></thead><tbody>'; 
-      my.forEach(r=>h+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning'}">${r.status}</td><td>${r.rejectionReason||'-'}</td></tr>`); 
+      let h='<h3>Peminjamanku</h3><table class="table"><thead><tr><th>Barang</th><th>Jumlah</th><th>Tgl Pinjam</th><th>Tgl Kembali</th><th>Status</th><th>Alasan</th><th>Approver</th></tr></thead><tbody>'; 
+      my.forEach(r=> {
+        const approver = r.approvedBy ? `✔️ ${r.approvedBy}` : (r.rejectedBy ? `❌ ${r.rejectedBy}` : '-');
+        h+=`<tr><td>${r.itemName}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td class="${r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning'}">${r.status}</td><td>${r.rejectionReason||'-'}</td><td>${approver}</td></tr>`;
+      }); 
       h+='</tbody></table>'; return h; 
     }
+
     function renderBorrowRequests() { 
       const pending=requests.filter(r=>r.status==='pending'); 
       if(!pending.length) return '<h3>Permintaan Pending</h3><p>Tidak ada.</p>'; 
@@ -709,22 +707,35 @@
       pending.forEach(r=>h+=`<tr><td>${r.borrowerName}</td><td>${r.itemName}</td><td>${r.quantity}</td><td><button class="btn btn-sm btn-success" onclick="approveRequest('${r.id}')">Setujui</button> <button class="btn btn-sm btn-danger" onclick="rejectRequest('${r.id}')">Tolak</button></td></tr>`); 
       h+='</tbody></table>'; return h; 
     }
+
     async function approveRequest(id) { 
-      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin','error'); return; }
+      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menyetujui','error'); return; }
       const req=requests.find(r=>r.id===id); if(!req) return; 
       const item=items.find(i=>i.id===req.itemId); if(item.quantity<req.quantity){ showToast('Stok tidak cukup','error'); return; } 
+      // Kurangi stok dan simpan approver
       await updateItem(item.id, {quantity: item.quantity - req.quantity});
-      await db.collection('borrow_requests').doc(id).update({status:'approved'}); showToast('Disetujui','success'); 
+      await db.collection('borrow_requests').doc(id).update({
+        status: 'approved',
+        approvedBy: u.name,
+        approvedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast('Disetujui, stok berkurang','success'); 
     }
+
     async function rejectRequest(id) { 
-      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin','error'); return; }
+      const u=getCurrentUser(); if(u?.role !== 'admin') { showToast('Hanya admin yang dapat menolak','error'); return; }
       const reason = prompt('Alasan penolakan (boleh kosong):');
       if (reason === null) return;
-      const updateData = { status: 'rejected' };
+      const updateData = { 
+        status: 'rejected',
+        rejectedBy: u.name,
+        rejectedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
       if (reason.trim()) updateData.rejectionReason = reason.trim();
       await db.collection('borrow_requests').doc(id).update(updateData);
-      showToast('Ditolak','info'); 
+      showToast('Permintaan ditolak','info'); 
     }
+
     function renderActiveLoans() {
       const active = requests.filter(r => r.status === 'approved');
       if (!active.length) return '<h3>Peminjaman Aktif</h3><p>Tidak ada.</p>';
@@ -732,6 +743,7 @@
       active.forEach(r => html += `<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td>${r.borrowDate}</td><td>${r.returnDate}</td><td><button class="btn btn-sm btn-primary" onclick="returnItem('${r.id}')"><i class="fas fa-undo-alt"></i> Kembalikan</button></td></tr>`);
       html += '</tbody></table>'; return html;
     }
+
     async function returnItem(requestId) {
       const req = requests.find(r => r.id === requestId); if (!req) return;
       if (req.status !== 'approved') { showToast('Peminjaman tidak aktif', 'error'); return; }
@@ -743,12 +755,14 @@
       showToast('Berhasil dikembalikan', 'success');
       if (currentPage === 'activeLoans') renderPage();
     }
+
     function renderHistory() { 
       if(!requests.length) return '<h3>Riwayat</h3><p>Kosong</p>'; 
-      let h='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th><th>Tanggal Pinjam</th><th>Rencana Kembali</th><th>Tanggal Kembali</th><th>Alasan Tolak</th></tr></thead><tbody>'; 
+      let h='<h3>Riwayat Peminjaman</h3><table class="table"><thead><tr><th>Peminjam</th><th>Barang</th><th>Jumlah</th><th>Status</th><th>Tanggal Pinjam</th><th>Rencana Kembali</th><th>Tanggal Kembali</th><th>Alasan Tolak</th><th>Approver</th></tr></thead><tbody>'; 
       requests.forEach(r=> {
+        const approver = r.approvedBy ? `✔️ ${r.approvedBy}` : (r.rejectedBy ? `❌ ${r.rejectedBy}` : '-');
         const cls = r.status==='approved'?'text-success':r.status==='rejected'?'text-danger':r.status==='returned'?'text-info':'text-warning';
-        h+=`<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td class="${cls}">${escapeHtml(r.status)}</td><td>${escapeHtml(r.borrowDate||'-')}</td><td>${escapeHtml(r.returnDate||'-')}</td><td>${escapeHtml(r.actualReturnDate||'-')}</td><td>${escapeHtml(r.rejectionReason||'-')}</td></tr>`;
+        h+=`<tr><td>${escapeHtml(r.borrowerName)}</td><td>${escapeHtml(r.itemName)}</td><td>${r.quantity}</td><td class="${cls}">${escapeHtml(r.status)}</td><td>${escapeHtml(r.borrowDate||'-')}</td><td>${escapeHtml(r.returnDate||'-')}</td><td>${escapeHtml(r.actualReturnDate||'-')}</td><td>${escapeHtml(r.rejectionReason||'-')}</td><td>${approver}</td></tr>`;
       }); 
       h+='</tbody></table>'; return h; 
     }
@@ -825,6 +839,19 @@
 
     function escapeHtml(s) { if(!s) return ''; return s.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
+    function updateDeleteButtonVisibility() { const b=document.getElementById('deleteSelectedBtn'); if(b) b.style.display = document.querySelectorAll('.item-checkbox:checked').length ? 'inline-block':'none'; }
+    function toggleSelectAll() { const s=document.getElementById('selectAllCheckbox'); document.querySelectorAll('.item-checkbox').forEach(c=>c.checked=s.checked); updateDeleteButtonVisibility(); }
+    async function deleteItemConfirm(id) { if(confirm('Hapus?')) await deleteItem(id); }
+    async function deleteSelectedItems() { 
+      const cbs=document.querySelectorAll('.item-checkbox:checked'); 
+      if(!cbs.length){ showToast('Pilih item','warning'); return; } 
+      if(!confirm(`Hapus ${cbs.length} item?`)) return; 
+      let d=0; for(let cb of cbs) if(await deleteItem(cb.value)) d++; 
+      showToast(`${d} item dihapus`,'success'); 
+      document.getElementById('selectAllCheckbox').checked=false; 
+      updateDeleteButtonVisibility(); 
+    }
+
     // ==================== PWA ====================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -844,7 +871,8 @@
     }
 
     window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault(); deferredPrompt = e;
+      e.preventDefault();
+      deferredPrompt = e;
       updatePWATombolState();
     });
 
@@ -864,20 +892,21 @@
 
     async function updatePWATombolState() {
       const installBtn = document.getElementById('pwaInstallBtn');
-      const openBtn = document.getElementById('pwaOpenBtn');
+      if (!installBtn) return;
       const installed = await checkInstallStatus();
-      if (installed) {
-        installBtn.classList.remove('show');
-        openBtn.classList.add('show');
+      // Tombol install hanya muncul jika belum terpasang dan prompt tersedia
+      if (!installed && deferredPrompt) {
+        installBtn.classList.add('show');
       } else {
-        openBtn.classList.remove('show');
-        if (deferredPrompt) installBtn.classList.add('show');
-        else installBtn.classList.remove('show');
+        installBtn.classList.remove('show');
       }
     }
 
     function installPWA() {
-      if (!deferredPrompt) { showToast('Fitur install belum tersedia.', 'warning'); return; }
+      if (!deferredPrompt) {
+        showToast('Fitur install belum tersedia.', 'warning');
+        return;
+      }
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(choice => {
         if (choice.outcome === 'accepted') {
@@ -888,8 +917,6 @@
         updatePWATombolState();
       });
     }
-
-    function openPWA() { window.open(window.location.href, '_blank', 'noopener'); }
 
     window.addEventListener('appinstalled', () => {
       setInstallStatus();
