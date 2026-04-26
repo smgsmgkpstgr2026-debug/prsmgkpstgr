@@ -151,9 +151,14 @@
     let currentPage = 'login', itemFormModalObj = null, userModalInstance = null, forgotPasswordModal = null;
     let isItemsLoading = true, isUsersLoading = true;
     let filterName = '', sortOrder = 'asc';
-    const STORAGE_KEYS = { CURRENT_USER: 'current_user', PWA_INSTALLED: 'pwa_installed' };
+    const STORAGE_KEYS = { CURRENT_USER: 'current_user' };  // PWA_INSTALLED tidak lagi di localStorage
     let qrGeneratedForItems = new Set();
     let deferredPrompt = null;
+
+    // ==================== FINGERPRINT PERANGKAT ====================
+    function getDeviceFingerprint() {
+      return `${navigator.userAgent}|${screen.width}x${screen.height}|${new Date().getTimezoneOffset()}`;
+    }
 
     // ==================== FIRESTORE LISTENERS ====================
     function startItemsListener(cb) {
@@ -187,7 +192,6 @@
         users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         isUsersLoading = false;
         if (users.length === 0) await createDefaultUsers();
-        // Migrasi user lama ke Firebase Auth jika belum punya uid
         await migrateUsersToAuth();
         if (cb) cb(users);
         if (currentPage === 'manageUsers') renderPage();
@@ -197,7 +201,6 @@
     async function createDefaultUsers() {
       try {
         const batch = db.batch();
-        // Admin default: test@inv.com / test2026
         batch.set(db.collection('users').doc(), { name:'Admin', email:'test@inv.com', password:'test2026', role:'admin', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         batch.set(db.collection('users').doc(), { name:'Editor', email:'editor@inv.com', password:'editor', role:'editor', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
         batch.set(db.collection('users').doc(), { name:'Borrower', email:'user@inv.com', password:'user', role:'borrower', createdAt:firebase.firestore.FieldValue.serverTimestamp() });
@@ -205,13 +208,11 @@
       } catch(e) { console.error(e); }
     }
 
-    // Migrasi user existing ke Firebase Auth (jika belum punya uid)
     async function migrateUsersToAuth() {
       const apiKey = firebaseConfig.apiKey;
       for (let user of users) {
         if (!user.uid && user.email && user.password) {
           try {
-            // Daftarkan ke Firebase Auth via REST API
             const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -221,9 +222,7 @@
             if (data.localId) {
               await db.collection('users').doc(user.id).update({ uid: data.localId });
               user.uid = data.localId;
-              console.log(`Migrasi ${user.email} berhasil`);
             } else if (data.error && data.error.message === 'EMAIL_EXISTS') {
-              // Cari UID dari user yang sudah ada dengan email tersebut
               const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -247,7 +246,6 @@
     function getAllUsers() { return users; }
     function getUserById(id) { return users.find(u => u.id === id); }
 
-    // ==================== AUTH & USER MANAGEMENT ====================
     async function registerUserToAuth(email, password) {
       const apiKey = firebaseConfig.apiKey;
       const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
@@ -260,11 +258,9 @@
 
     async function addUser(userData) {
       try {
-        // Daftarkan ke Firebase Auth
         const authResult = await registerUserToAuth(userData.email, userData.password);
         if (authResult.error) {
           if (authResult.error.message === 'EMAIL_EXISTS') {
-            // Ambil UID yang sudah ada
             const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -273,7 +269,7 @@
             const signInData = await signInRes.json();
             if (signInData.localId) {
               userData.uid = signInData.localId;
-              delete userData.password; // jangan simpan password di Firestore
+              delete userData.password;
               await db.collection('users').add({...userData, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
               return true;
             } else {
@@ -283,7 +279,7 @@
           throw new Error(authResult.error.message);
         }
         userData.uid = authResult.localId;
-        delete userData.password; // tidak perlu menyimpan password lagi
+        delete userData.password;
         await db.collection('users').add({...userData, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
         return true;
       } catch(e) {
@@ -295,10 +291,7 @@
     async function updateUserById(id, data) {
       try {
         if (data.password) {
-          // Update password di Firebase Auth menggunakan REST API? Memerlukan idToken user.
-          // Untuk sekarang, admin tidak bisa mengubah password user langsung.
-          // Alternatif: kirim email reset password ke user.
-          showToast('Password tidak dapat diubah langsung oleh admin. Gunakan fitur Lupa Password.', 'warning');
+          showToast('Password tidak bisa diubah admin. Gunakan Lupa Password.', 'warning');
           delete data.password;
         }
         const { createdAt, ...up } = data;
@@ -310,32 +303,22 @@
     async function deleteUserById(id) {
       if (getCurrentUser()?.id === id) { showToast('Tidak bisa hapus sendiri','warning'); return false; }
       try {
-        const user = users.find(u => u.id === id);
-        if (user && user.uid) {
-          // Hapus dari Firebase Auth melalui REST API? Memerlukan idToken admin. Tidak bisa.
-          // Nonaktifkan saja dengan flag disabled, dan hapus dari Firestore.
-          // Kita set disabled: true di Firestore lalu hapus? Lebih baik set disabled saja.
-          await db.collection('users').doc(id).update({ disabled: true });
-          showToast('User dinonaktifkan (tidak bisa login lagi)', 'success');
-          return true;
-        }
-        await db.collection('users').doc(id).delete();
+        await db.collection('users').doc(id).update({ disabled: true });
+        showToast('User dinonaktifkan (tidak bisa login lagi)', 'success');
         return true;
       } catch(e) { showToast(e.message,'error'); return false; }
     }
 
-    // ==================== SESSION ====================
     function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
     function setCurrentUser(u) { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(u)); }
 
-    // ==================== TOAST ====================
     function showToast(msg, type='success') {
       const t = document.createElement('div'); t.className = `toast-notif ${type}`;
       t.innerHTML = `<i class="fas ${type==='success'?'fa-check-circle':(type==='error'?'fa-exclamation-circle':'fa-info-circle')} me-2"></i>${msg}`;
       document.body.appendChild(t); setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(),500); },4000);
     }
 
-    // ==================== LUPA PASSWORD (FIREBASE AUTH) ====================
+    // ==================== LUPA PASSWORD ====================
     function showForgotPasswordModal() { 
       document.getElementById('forgotEmail').value=''; 
       document.getElementById('forgotPasswordMessage').classList.add('d-none'); 
@@ -524,7 +507,6 @@
       renderNav(); 
     }
 
-    // LOGIN PAGE (Firebase Auth)
     function renderLogin() { 
       return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control" placeholder="contoh: test@inv.com"></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control" placeholder="Masukkan password"></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div></div></div></div></div>`; 
     }
@@ -534,11 +516,10 @@
       const password = document.getElementById('loginPassword').value;
       try {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        // Ambil data user dari Firestore berdasarkan email
         const snapshot = await db.collection('users').where('email', '==', email).get();
         if (snapshot.empty) {
           await auth.signOut();
-          showToast('User tidak ditemukan di database lokal', 'error');
+          showToast('User tidak ditemukan di database', 'error');
           return;
         }
         const userDoc = snapshot.docs[0];
@@ -818,7 +799,7 @@
       updateDeleteButtonVisibility(); 
     }
 
-    // ==================== PWA ====================
+    // ==================== PWA - SERVICE WORKER & AUTO UPDATE ====================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
@@ -835,48 +816,82 @@
         navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
       });
     }
+
+    // ==================== PWA - INSTALL & FINGERPRINT ====================
     window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault(); deferredPrompt = e;
-      document.getElementById('pwaInstallBtn').classList.add('show');
-      document.getElementById('pwaOpenBtn').classList.remove('show');
+      e.preventDefault();
+      deferredPrompt = e;
+      // Tampilkan tombol install hanya jika belum terinstal (akan dicek ulang di update tombol)
+      updatePWATombolState();
     });
-    function installPWA() {
-      if (!deferredPrompt) { showToast('Fitur install belum tersedia.', 'warning'); return; }
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(choice => {
-        if (choice.outcome === 'accepted') {
-          showToast('Aplikasi berhasil diinstall!', 'success');
-          localStorage.setItem(STORAGE_KEYS.PWA_INSTALLED, 'true');
-        }
-        deferredPrompt = null;
-        updatePWATombolState();
-      });
+
+    async function checkInstallStatus() {
+      const fp = getDeviceFingerprint();
+      try {
+        const doc = await db.collection('installations').doc(fp).get();
+        return doc.exists && doc.data().installed === true;
+      } catch(e) { return false; }
     }
-    function openPWA() { window.open(window.location.href, '_blank', 'noopener'); }
-    function updatePWATombolState() {
+
+    async function setInstallStatus() {
+      const fp = getDeviceFingerprint();
+      try {
+        await db.collection('installations').doc(fp).set({ installed: true, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+      } catch(e) { console.error('Gagal menyimpan status instalasi', e); }
+    }
+
+    async function updatePWATombolState() {
       const installBtn = document.getElementById('pwaInstallBtn');
       const openBtn = document.getElementById('pwaOpenBtn');
-      const installed = localStorage.getItem(STORAGE_KEYS.PWA_INSTALLED) === 'true' || window.matchMedia('(display-mode: standalone)').matches;
+      const installed = await checkInstallStatus();
       if (installed) {
         installBtn.classList.remove('show');
         openBtn.classList.add('show');
       } else {
         openBtn.classList.remove('show');
-        if (deferredPrompt) installBtn.classList.add('show');
-        else installBtn.classList.remove('show');
+        // Tampilkan tombol install jika browser mendukung (deferredPrompt ada) dan belum terinstal
+        if (deferredPrompt) {
+          installBtn.classList.add('show');
+        } else {
+          installBtn.classList.remove('show');
+        }
       }
     }
+
+    function installPWA() {
+      if (!deferredPrompt) {
+        showToast('Fitur install belum tersedia.', 'warning');
+        return;
+      }
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(choice => {
+        if (choice.outcome === 'accepted') {
+          showToast('Aplikasi berhasil diinstall!', 'success');
+          setInstallStatus();  // simpan ke Firestore
+        }
+        deferredPrompt = null;
+        updatePWATombolState();
+      });
+    }
+
+    function openPWA() {
+      window.open(window.location.href, '_blank', 'noopener');
+    }
+
     window.addEventListener('appinstalled', () => {
-      localStorage.setItem(STORAGE_KEYS.PWA_INSTALLED, 'true');
+      setInstallStatus();
       deferredPrompt = null;
       updatePWATombolState();
     });
-    updatePWATombolState();
 
     // ==================== INIT ====================
     window.onload = async () => {
       const params = new URLSearchParams(window.location.search), itemId = params.get('item');
       startUsersListener();
+      
+      // Update status tombol PWA berdasarkan fingerprint
+      updatePWATombolState();
+
       if (itemId) {
         try {
           const doc = await db.collection('items').doc(itemId).get();
@@ -884,7 +899,6 @@
           else document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Barang tidak ditemukan</div>';
         } catch(e) { document.getElementById('pageContent').innerHTML='<div class="alert alert-danger">Error</div>'; }
       } else {
-        // Jika sudah login, langsung ke inventory
         auth.onAuthStateChanged(async user => {
           if (user) {
             const snapshot = await db.collection('users').where('email', '==', user.email).get();
