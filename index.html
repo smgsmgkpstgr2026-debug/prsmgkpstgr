@@ -30,7 +30,8 @@
     .card { box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .item-image { max-width: 100%; max-height: 200px; object-fit: contain; display: block; margin: 0 auto; }
     #hiddenFileInput { display: none; }
-    .qr-code { width: 100px; height: 100px; cursor: pointer; margin: 0 auto; }
+    .qr-code { width: 100px; height: 100px; cursor: pointer; margin: 0 auto; display: inline-block; }
+    .qr-code img { display: block; margin: 0 auto; }
     .forgot-password-link { cursor: pointer; color: #0d6efd; text-decoration: underline; }
     .forgot-password-link:hover { color: #0a58ca; }
     .delete-selected-btn { margin-right: 10px; }
@@ -151,9 +152,10 @@
     let currentPage = 'login', itemFormModalObj = null, userModalInstance = null, forgotPasswordModal = null;
     let isItemsLoading = true, isUsersLoading = true;
     let filterName = '', sortOrder = 'asc';
-    const STORAGE_KEYS = { CURRENT_USER: 'current_user' };  // PWA_INSTALLED tidak lagi di localStorage
+    const STORAGE_KEYS = { CURRENT_USER: 'current_user' };
     let qrGeneratedForItems = new Set();
     let deferredPrompt = null;
+    let itemDetailModalInstance = null;
 
     // ==================== FINGERPRINT PERANGKAT ====================
     function getDeviceFingerprint() {
@@ -214,8 +216,7 @@
         if (!user.uid && user.email && user.password) {
           try {
             const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: user.email, password: user.password, returnSecureToken: false })
             });
             const data = await res.json();
@@ -224,8 +225,7 @@
               user.uid = data.localId;
             } else if (data.error && data.error.message === 'EMAIL_EXISTS') {
               const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: user.email, password: user.password, returnSecureToken: false })
               });
               const signInData = await signInRes.json();
@@ -249,8 +249,7 @@
     async function registerUserToAuth(email, password) {
       const apiKey = firebaseConfig.apiKey;
       const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, returnSecureToken: false })
       });
       return res.json();
@@ -262,8 +261,7 @@
         if (authResult.error) {
           if (authResult.error.message === 'EMAIL_EXISTS') {
             const signInRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: userData.email, password: userData.password, returnSecureToken: false })
             });
             const signInData = await signInRes.json();
@@ -272,9 +270,7 @@
               delete userData.password;
               await db.collection('users').add({...userData, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
               return true;
-            } else {
-              throw new Error('Email sudah ada tetapi password salah?');
-            }
+            } else { throw new Error('Email sudah ada tetapi password salah?'); }
           }
           throw new Error(authResult.error.message);
         }
@@ -290,10 +286,7 @@
 
     async function updateUserById(id, data) {
       try {
-        if (data.password) {
-          showToast('Password tidak bisa diubah admin. Gunakan Lupa Password.', 'warning');
-          delete data.password;
-        }
+        if (data.password) { showToast('Password tidak bisa diubah admin. Gunakan Lupa Password.', 'warning'); delete data.password; }
         const { createdAt, ...up } = data;
         await db.collection('users').doc(id).update(up);
         return true;
@@ -302,11 +295,8 @@
 
     async function deleteUserById(id) {
       if (getCurrentUser()?.id === id) { showToast('Tidak bisa hapus sendiri','warning'); return false; }
-      try {
-        await db.collection('users').doc(id).update({ disabled: true });
-        showToast('User dinonaktifkan (tidak bisa login lagi)', 'success');
-        return true;
-      } catch(e) { showToast(e.message,'error'); return false; }
+      try { await db.collection('users').doc(id).update({ disabled: true }); showToast('User dinonaktifkan','success'); return true; }
+      catch(e) { showToast(e.message,'error'); return false; }
     }
 
     function getCurrentUser() { return JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)); }
@@ -342,20 +332,55 @@
       }
     }
 
-    // ==================== UPLOAD & PREVIEW ====================
-    function uploadImage(file) { return new Promise((res,rej)=>{ const r = new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(file); }); }
+    // ==================== UPLOAD & PREVIEW (DIPERBAIKI) ====================
+    function uploadImage(file) {
+      // Batasi ukuran file asli, agar base64 tidak terlalu besar
+      const MAX_FILE_SIZE = 700 * 1024; // 700 KB
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error('Ukuran gambar terlalu besar. Maksimal 700KB.');
+      }
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Gagal membaca file.'));
+        reader.readAsDataURL(file);
+      });
+    }
+
     async function triggerFileUploadForItem() {
       const inp = document.getElementById('hiddenFileInput');
       inp.onchange = async e => {
-        const f = e.target.files[0]; if(f) { try { document.getElementById('itemImageUrl').value = await uploadImage(f); updateImagePreview(); showToast('Gambar siap','success'); } catch(err) { showToast('Gagal upload','error'); } }
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const base64 = await uploadImage(file);
+          // Batasi panjang string base64 (Firestore batas ~1MB per dokumen, kita amankan 900KB)
+          if (base64.length > 900000) {
+            throw new Error('Gambar terlalu besar setelah konversi. Maksimal 1MB.');
+          }
+          document.getElementById('itemImageUrl').value = base64;
+          updateImagePreview();
+          showToast('Gambar berhasil diunggah', 'success');
+        } catch (err) {
+          showToast('Upload gagal: ' + err.message, 'error');
+        }
+        // Reset input file agar bisa mengupload file yang sama
         inp.value = '';
       };
       inp.click();
     }
+
     function updateImagePreview() {
-      const url = document.getElementById('itemImageUrl').value.trim(), preview = document.getElementById('imagePreview');
-      if(url) { preview.src = url; preview.style.display = 'block'; preview.onerror = () => { preview.style.display = 'none'; }; }
-      else { preview.style.display = 'none'; preview.src = ''; }
+      const url = document.getElementById('itemImageUrl').value.trim();
+      const preview = document.getElementById('imagePreview');
+      if (url) {
+        preview.src = url;
+        preview.style.display = 'block';
+        preview.onerror = () => { preview.style.display = 'none'; };
+      } else {
+        preview.style.display = 'none';
+        preview.src = '';
+      }
     }
 
     // ==================== MODAL ITEM ====================
@@ -517,39 +542,22 @@
       try {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const snapshot = await db.collection('users').where('email', '==', email).get();
-        if (snapshot.empty) {
-          await auth.signOut();
-          showToast('User tidak ditemukan di database', 'error');
-          return;
-        }
-        const userDoc = snapshot.docs[0];
-        const userData = userDoc.data();
-        if (userData.disabled) {
-          await auth.signOut();
-          showToast('Akun dinonaktifkan. Hubungi admin.', 'error');
-          return;
-        }
+        if (snapshot.empty) { await auth.signOut(); showToast('User tidak ditemukan di database', 'error'); return; }
+        const userDoc = snapshot.docs[0], userData = userDoc.data();
+        if (userData.disabled) { await auth.signOut(); showToast('Akun dinonaktifkan', 'error'); return; }
         setCurrentUser({ id: userDoc.id, name: userData.name, email: userData.email, role: userData.role });
-        startItemsListener();
-        startRequestsListener();
+        startItemsListener(); startRequestsListener();
         navigate('inventory');
       } catch(e) {
-        console.error(e);
-        if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-email' || e.code === 'auth/wrong-password') {
-          showToast('Email atau password salah', 'error');
-        } else {
-          showToast('Login gagal: ' + e.message, 'error');
-        }
+        if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') showToast('Email atau password salah', 'error');
+        else showToast('Login gagal: ' + e.message, 'error');
       }
     }
 
     function logout() { 
-      auth.signOut().catch(e => console.warn);
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); 
-      if(itemsListener) itemsListener(); 
-      if(requestsListener) requestsListener(); 
-      navigate('login'); 
-      showToast('Logout berhasil','info'); 
+      auth.signOut().catch(e => console.warn); localStorage.removeItem(STORAGE_KEYS.CURRENT_USER); 
+      if(itemsListener) itemsListener(); if(requestsListener) requestsListener(); 
+      navigate('login'); showToast('Logout berhasil','info'); 
     }
 
     // ==================== INVENTORY ====================
@@ -580,12 +588,22 @@
         </tr>`;
       });
       tbody.innerHTML = html;
+      
       setTimeout(() => {
         filtered.forEach(it => {
           const container = document.getElementById(`qr-${it.id}`);
           if (container) {
-            container.innerHTML = '';
-            try { new QRCode(container, { text: window.location.origin + window.location.pathname + '?item=' + it.id, width: 100, height: 100 }); qrGeneratedForItems.add(it.id); } catch(e) {}
+            container.innerHTML = '<span style="display:flex; align-items:center; justify-content:center; width:100%; height:100%"></span>';
+            const qrWrapper = container.querySelector('span');
+            if (qrWrapper) {
+              try {
+                new QRCode(qrWrapper, {
+                  text: window.location.origin + window.location.pathname + '?item=' + it.id,
+                  width: 100, height: 100
+                });
+                qrGeneratedForItems.add(it.id);
+              } catch(e) { console.warn('QR gagal', it.id, e); }
+            }
           }
         });
         updateDeleteButtonVisibility();
@@ -785,21 +803,29 @@
       if(await deleteUserById(id)) showToast('User dinonaktifkan','success'); 
     }
 
-    function escapeHtml(s) { if(!s) return ''; return s.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
-    function updateDeleteButtonVisibility() { const b=document.getElementById('deleteSelectedBtn'); if(b) b.style.display = document.querySelectorAll('.item-checkbox:checked').length ? 'inline-block':'none'; }
-    function toggleSelectAll() { const s=document.getElementById('selectAllCheckbox'); document.querySelectorAll('.item-checkbox').forEach(c=>c.checked=s.checked); updateDeleteButtonVisibility(); }
-    async function deleteItemConfirm(id) { if(confirm('Hapus?')) await deleteItem(id); }
-    async function deleteSelectedItems() { 
-      const cbs=document.querySelectorAll('.item-checkbox:checked'); 
-      if(!cbs.length){ showToast('Pilih item','warning'); return; } 
-      if(!confirm(`Hapus ${cbs.length} item?`)) return; 
-      let d=0; for(let cb of cbs) if(await deleteItem(cb.value)) d++; 
-      showToast(`${d} item dihapus`,'success'); 
-      document.getElementById('selectAllCheckbox').checked=false; 
-      updateDeleteButtonVisibility(); 
+    // ==================== FUNGSI DETAIL & MODAL ====================
+    function showItemDetail(id) { 
+      const it = items.find(i => i.id === id); 
+      if(it) {
+        try { displayItemDetailModal(it); } catch(e) { console.error(e); showToast('Gagal menampilkan detail', 'error'); }
+      } else showToast('Barang tidak ditemukan','error'); 
     }
 
-    // ==================== PWA - SERVICE WORKER & AUTO UPDATE ====================
+    function displayItemDetailModal(it) {
+      const body = document.getElementById('itemDetailBody');
+      if (!body) return;
+      body.innerHTML = `
+        <div class="text-center mb-3">${it.image ? `<img src="${it.image}" class="item-image">` : '<div class="alert alert-secondary">Tidak ada gambar</div>'}</div>
+        <h6 class="text-center text-primary fw-bold mb-3"><i class="fas fa-tag me-2"></i>Asset Sekolah Minggu GKPS Tangerang</h6>
+        <p><strong>Nama:</strong> ${escapeHtml(it.name)}</p><p><strong>Type:</strong> ${escapeHtml(it.type||'-')}</p><p><strong>Lama:</strong> ${escapeHtml(it.lama||'-')}</p><p><strong>Baru:</strong> ${escapeHtml(it.baru||'-')}</p><p><strong>Stok:</strong> ${it.quantity}</p><p><strong>Lokasi:</strong> ${escapeHtml(it.location||'-')}</p><p><strong>Status:</strong> ${escapeHtml(it.status||'Baik')}</p><p><strong>Catatan:</strong> ${escapeHtml(it.notes||'-')}</p>
+      `;
+      if (!itemDetailModalInstance) itemDetailModalInstance = new bootstrap.Modal(document.getElementById('itemDetailModal'));
+      itemDetailModalInstance.show();
+    }
+
+    function escapeHtml(s) { if(!s) return ''; return s.replace(/[&<>]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+    // ==================== PWA ====================
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').then(reg => {
@@ -817,11 +843,8 @@
       });
     }
 
-    // ==================== PWA - INSTALL & FINGERPRINT ====================
     window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      // Tampilkan tombol install hanya jika belum terinstal (akan dicek ulang di update tombol)
+      e.preventDefault(); deferredPrompt = e;
       updatePWATombolState();
     });
 
@@ -835,9 +858,8 @@
 
     async function setInstallStatus() {
       const fp = getDeviceFingerprint();
-      try {
-        await db.collection('installations').doc(fp).set({ installed: true, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-      } catch(e) { console.error('Gagal menyimpan status instalasi', e); }
+      try { await db.collection('installations').doc(fp).set({ installed: true, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); }
+      catch(e) { console.error('Gagal menyimpan status instalasi', e); }
     }
 
     async function updatePWATombolState() {
@@ -849,34 +871,25 @@
         openBtn.classList.add('show');
       } else {
         openBtn.classList.remove('show');
-        // Tampilkan tombol install jika browser mendukung (deferredPrompt ada) dan belum terinstal
-        if (deferredPrompt) {
-          installBtn.classList.add('show');
-        } else {
-          installBtn.classList.remove('show');
-        }
+        if (deferredPrompt) installBtn.classList.add('show');
+        else installBtn.classList.remove('show');
       }
     }
 
     function installPWA() {
-      if (!deferredPrompt) {
-        showToast('Fitur install belum tersedia.', 'warning');
-        return;
-      }
+      if (!deferredPrompt) { showToast('Fitur install belum tersedia.', 'warning'); return; }
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(choice => {
         if (choice.outcome === 'accepted') {
           showToast('Aplikasi berhasil diinstall!', 'success');
-          setInstallStatus();  // simpan ke Firestore
+          setInstallStatus();
         }
         deferredPrompt = null;
         updatePWATombolState();
       });
     }
 
-    function openPWA() {
-      window.open(window.location.href, '_blank', 'noopener');
-    }
+    function openPWA() { window.open(window.location.href, '_blank', 'noopener'); }
 
     window.addEventListener('appinstalled', () => {
       setInstallStatus();
@@ -888,8 +901,6 @@
     window.onload = async () => {
       const params = new URLSearchParams(window.location.search), itemId = params.get('item');
       startUsersListener();
-      
-      // Update status tombol PWA berdasarkan fingerprint
       updatePWATombolState();
 
       if (itemId) {
@@ -906,20 +917,11 @@
               const u = snapshot.docs[0];
               if (!u.data().disabled) {
                 setCurrentUser({ id: u.id, name: u.data().name, email: u.data().email, role: u.data().role });
-                startItemsListener();
-                startRequestsListener();
+                startItemsListener(); startRequestsListener();
                 navigate('inventory');
-              } else {
-                auth.signOut();
-                navigate('login');
-              }
-            } else {
-              auth.signOut();
-              navigate('login');
-            }
-          } else {
-            navigate('login');
-          }
+              } else { auth.signOut(); navigate('login'); }
+            } else { auth.signOut(); navigate('login'); }
+          } else navigate('login');
         });
       }
     };
