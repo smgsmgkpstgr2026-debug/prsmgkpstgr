@@ -75,7 +75,6 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto" id="navLinks"></ul>
         <span class="navbar-text text-white me-3" id="userDisplay"></span>
-        <!-- Hanya tombol install, tombol buka aplikasi DIHAPUS -->
         <button class="btn btn-light btn-sm" id="pwaInstallBtn" onclick="installPWA()"><i class="fas fa-download"></i> Install Aplikasi</button>
         <button class="btn btn-light btn-sm" onclick="logout()">Logout</button>
       </div>
@@ -284,34 +283,12 @@
       }
     }
 
-    // ================== PERBAIKAN: updateUserById bisa ubah password ==================
+    // ================== PERBAIKAN: updateUserById TIDAK mengubah password agar tidak merusak Auth ==================
     async function updateUserById(id, data) {
       try {
-        // Pisahkan password dari data lain, createdAt tidak diubah
-        const { createdAt, password, ...up } = data;
-        
-        // Jika admin mengisi password baru, update juga di Firestore
-        if (password && password.trim().length > 0) {
-          up.password = password.trim();
-        }
-        
+        // Buang field password dan createdAt, hanya update nama, email, role, dll.
+        const { password, createdAt, ...up } = data;
         await db.collection('users').doc(id).update(up);
-        
-        // Jika password diisi dan user punya email, kirim email reset password agar password Auth ikut berubah
-        if (up.password && data.email) {
-          const userDoc = users.find(u => u.id === id);
-          if (userDoc && userDoc.uid) {
-            try {
-              await auth.sendPasswordResetEmail(data.email);
-              showToast('Password diupdate & email reset telah dikirim ke user', 'success');
-            } catch (e) {
-              showToast('Password diupdate di database, tapi gagal mengirim email reset: ' + e.message, 'warning');
-            }
-          } else {
-            showToast('Password berhasil diupdate', 'success');
-          }
-        }
-        
         return true;
       } catch(e) {
         showToast(e.message, 'error');
@@ -555,21 +532,77 @@
       return `<div class="row justify-content-center"><div class="col-md-6"><div class="card"><div class="card-header bg-primary text-white">Login</div><div class="card-body"><div class="mb-3"><label>Email</label><input type="email" id="loginEmail" class="form-control" placeholder="contoh: test@inv.com"></div><div class="mb-3"><label>Password</label><input type="password" id="loginPassword" class="form-control" placeholder="Masukkan password"></div><button class="btn btn-primary w-100" onclick="doLogin()">Login</button><hr><div class="text-center"><span class="forgot-password-link" onclick="showForgotPasswordModal()"><i class="fas fa-key"></i> Lupa Password?</span></div></div></div></div></div>`; 
     }
 
+    // ================== PERBAIKAN: doLogin dengan fallback sinkronisasi password ==================
     async function doLogin() { 
       const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
       try {
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        // Coba login dengan Firebase Auth
+        await auth.signInWithEmailAndPassword(email, password);
+      } catch(e) {
+        // Jika gagal, coba sinkronkan ulang dari Firestore
+        if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
+          const snapshot = await db.collection('users').where('email', '==', email).get();
+          if (!snapshot.empty) {
+            const userDoc = snapshot.docs[0];
+            const userData = userDoc.data();
+            // Cek apakah password di Firestore cocok
+            if (userData.password === password) {
+              // Daftarkan ulang ke Firebase Auth
+              const apiKey = firebaseConfig.apiKey;
+              const signUpRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, returnSecureToken: false })
+              });
+              const signUpData = await signUpRes.json();
+              if (signUpData.localId) {
+                await db.collection('users').doc(userDoc.id).update({ uid: signUpData.localId });
+                // Coba login lagi
+                await auth.signInWithEmailAndPassword(email, password);
+              } else if (signUpData.error && signUpData.error.message === 'EMAIL_EXISTS') {
+                // Email sudah ada di Auth dengan password berbeda, kirim email reset
+                try {
+                  await auth.sendPasswordResetEmail(email);
+                  throw new Error('Password tidak cocok dengan database. Email reset password telah dikirim. Silakan cek inbox Anda untuk mereset password, lalu login kembali.');
+                } catch (resetErr) {
+                  throw new Error('Gagal mengirim email reset password. Silakan gunakan fitur Lupa Password.');
+                }
+              } else {
+                throw new Error('Gagal sinkronisasi akun. Silakan hubungi admin.');
+              }
+            } else {
+              throw new Error('Email atau password salah');
+            }
+          } else {
+            throw new Error('Email atau password salah');
+          }
+        } else {
+          throw e;
+        }
+      }
+
+      // Jika login berhasil, lanjutkan seperti biasa
+      try {
         const snapshot = await db.collection('users').where('email', '==', email).get();
-        if (snapshot.empty) { await auth.signOut(); showToast('User tidak ditemukan di database', 'error'); return; }
-        const userDoc = snapshot.docs[0], userData = userDoc.data();
-        if (userData.disabled) { await auth.signOut(); showToast('Akun dinonaktifkan', 'error'); return; }
+        if (snapshot.empty) { 
+          await auth.signOut(); 
+          showToast('User tidak ditemukan di database', 'error'); 
+          return; 
+        }
+        const userDoc = snapshot.docs[0];
+        const userData = userDoc.data();
+        if (userData.disabled) { 
+          await auth.signOut(); 
+          showToast('Akun dinonaktifkan', 'error'); 
+          return; 
+        }
         setCurrentUser({ id: userDoc.id, name: userData.name, email: userData.email, role: userData.role });
-        startItemsListener(); startRequestsListener();
+        startItemsListener(); 
+        startRequestsListener();
         navigate('inventory');
       } catch(e) {
-        if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') showToast('Email atau password salah', 'error');
-        else showToast('Login gagal: ' + e.message, 'error');
+        showToast('Login gagal: ' + e.message, 'error');
+        await auth.signOut().catch(() => {});
       }
     }
 
@@ -803,7 +836,8 @@
         const disabled = usr.disabled ? '<span class="badge bg-danger">Nonaktif</span>' : '<span class="badge bg-success">Aktif</span>';
         h+=`<tr><td>${escapeHtml(usr.name)} ${u.id===usr.id?'<span class="badge bg-info">Anda</span>':''}</td><td>${escapeHtml(usr.email)}</td><td>${roleDisplay}</td><td>${disabled}</td>
         <td><button class="btn btn-sm btn-warning" onclick="editUser('${usr.id}')"><i class="fas fa-edit"></i></button> 
-        <button class="btn btn-sm btn-danger" onclick="deleteUser('${usr.id}')" ${u.id===usr.id?'disabled':''}><i class="fas fa-trash"></i></button></td></tr>`;
+        <button class="btn btn-sm btn-danger" onclick="deleteUser('${usr.id}')" ${u.id===usr.id?'disabled':''}><i class="fas fa-trash"></i></button>
+        <button class="btn btn-sm btn-secondary" onclick="sendResetEmailToUser('${usr.email}')"><i class="fas fa-envelope"></i> Reset Password</button></td></tr>`;
       }); 
       h+='</tbody></table>'; return h; 
     }
@@ -814,13 +848,13 @@
       const isEdit=!!user; document.getElementById('userModalTitle').innerText=isEdit?'Edit User':'Tambah User'; 
       document.getElementById('editUserId').value=user?.id||''; document.getElementById('userName').value=user?.name||''; 
       document.getElementById('userEmail').value=user?.email||''; document.getElementById('userPassword').value=''; 
-      document.getElementById('userPassword').placeholder=isEdit?'Password tidak dapat diubah':'Minimal 4 karakter'; 
+      document.getElementById('userPassword').placeholder=isEdit?'Kosongkan (gunakan tombol Reset Password)':'Minimal 4 karakter'; 
       document.getElementById('userRole').value=user?.role||'borrower'; 
       if(userModalInstance) userModalInstance.dispose(); 
       userModalInstance=new bootstrap.Modal(document.getElementById('userModal'),{backdrop:'static'}); userModalInstance.show(); 
     }
 
-    // ================== PERBAIKAN: saveUser bisa ubah password ==================
+    // ================== PERBAIKAN: saveUser sekarang hanya untuk nama/email/role, password tidak diubah ==================
     async function saveUser() { 
       const id=document.getElementById('editUserId').value, name=document.getElementById('userName').value.trim(), email=document.getElementById('userEmail').value.trim(), pass=document.getElementById('userPassword').value, role=document.getElementById('userRole').value; 
       if(!name||!email){ showToast('Nama dan email harus diisi','warning'); return; } 
@@ -830,17 +864,28 @@
         const success = await addUser({name,email,password:pass,role}); 
         if(success) showToast('User ditambahkan (terdaftar di Auth)','success'); 
       } else { 
+        // Edit user: abaikan password, hanya update nama/email/role
         const upd={name,email,role};
-        // Jika password diisi, ikutkan dalam update
+        // Jika admin mengisi password, abaikan dan beri tahu
         if(pass && pass.trim().length > 0){
-          if(pass.length < 4){ showToast('Password minimal 4 karakter','warning'); return; }
-          upd.password = pass.trim();
+          showToast('Password tidak bisa diubah langsung. Gunakan tombol "Reset Password" untuk mengirim email reset ke user.', 'warning');
         }
         await updateUserById(id,upd); 
         if(getCurrentUser().id===id) setCurrentUser({...getCurrentUser(),name,email,role}); 
         showToast('User diupdate','success'); 
       } 
       userModalInstance.hide(); 
+    }
+
+    // Fungsi baru untuk admin mengirim email reset password ke user
+    async function sendResetEmailToUser(email) {
+      try {
+        await auth.sendPasswordResetEmail(email);
+        showToast('Email reset password telah dikirim ke ' + email, 'success');
+      } catch(e) {
+        if(e.code==='auth/user-not-found') showToast('Email tidak terdaftar di sistem autentikasi', 'error');
+        else showToast('Gagal mengirim email: ' + e.message, 'error');
+      }
     }
 
     async function deleteUser(id) { 
@@ -925,7 +970,6 @@
       const installBtn = document.getElementById('pwaInstallBtn');
       if (!installBtn) return;
       const installed = await checkInstallStatus();
-      // Tombol install hanya muncul jika belum terpasang dan prompt tersedia
       if (!installed && deferredPrompt) {
         installBtn.classList.add('show');
       } else {
