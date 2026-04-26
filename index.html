@@ -284,13 +284,39 @@
       }
     }
 
+    // ================== PERBAIKAN: updateUserById bisa ubah password ==================
     async function updateUserById(id, data) {
       try {
-        if (data.password) { showToast('Password tidak bisa diubah admin. Gunakan Lupa Password.', 'warning'); delete data.password; }
-        const { createdAt, ...up } = data;
+        // Pisahkan password dari data lain, createdAt tidak diubah
+        const { createdAt, password, ...up } = data;
+        
+        // Jika admin mengisi password baru, update juga di Firestore
+        if (password && password.trim().length > 0) {
+          up.password = password.trim();
+        }
+        
         await db.collection('users').doc(id).update(up);
+        
+        // Jika password diisi dan user punya email, kirim email reset password agar password Auth ikut berubah
+        if (up.password && data.email) {
+          const userDoc = users.find(u => u.id === id);
+          if (userDoc && userDoc.uid) {
+            try {
+              await auth.sendPasswordResetEmail(data.email);
+              showToast('Password diupdate & email reset telah dikirim ke user', 'success');
+            } catch (e) {
+              showToast('Password diupdate di database, tapi gagal mengirim email reset: ' + e.message, 'warning');
+            }
+          } else {
+            showToast('Password berhasil diupdate', 'success');
+          }
+        }
+        
         return true;
-      } catch(e) { showToast(e.message,'error'); return false; }
+      } catch(e) {
+        showToast(e.message, 'error');
+        return false;
+      }
     }
 
     async function deleteUserById(id) {
@@ -794,6 +820,7 @@
       userModalInstance=new bootstrap.Modal(document.getElementById('userModal'),{backdrop:'static'}); userModalInstance.show(); 
     }
 
+    // ================== PERBAIKAN: saveUser bisa ubah password ==================
     async function saveUser() { 
       const id=document.getElementById('editUserId').value, name=document.getElementById('userName').value.trim(), email=document.getElementById('userEmail').value.trim(), pass=document.getElementById('userPassword').value, role=document.getElementById('userRole').value; 
       if(!name||!email){ showToast('Nama dan email harus diisi','warning'); return; } 
@@ -803,8 +830,12 @@
         const success = await addUser({name,email,password:pass,role}); 
         if(success) showToast('User ditambahkan (terdaftar di Auth)','success'); 
       } else { 
-        const upd={name,email,role}; 
-        if(pass){ showToast('Password tidak bisa diubah admin. Gunakan Lupa Password.','warning'); } 
+        const upd={name,email,role};
+        // Jika password diisi, ikutkan dalam update
+        if(pass && pass.trim().length > 0){
+          if(pass.length < 4){ showToast('Password minimal 4 karakter','warning'); return; }
+          upd.password = pass.trim();
+        }
         await updateUserById(id,upd); 
         if(getCurrentUser().id===id) setCurrentUser({...getCurrentUser(),name,email,role}); 
         showToast('User diupdate','success'); 
